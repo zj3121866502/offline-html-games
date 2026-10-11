@@ -1,0 +1,2694 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>韭菜翻身记 · 单机炒股模拟器</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📈</text></svg>">
+<style>
+:root{
+  --bg:#0a1017; --panel:#101a27; --panel2:#0d1622; --line:#223349;
+  --tx:#d9e4f2; --dim:#8ba3c0; --faint:#5b7290;
+  --up:#ff5252; --up2:#ff8a8a; --dn:#2bd48a; --dn2:#7de8bb;
+  --gold:#f5b942; --cyan:#5ad1ff;
+  --mastA:#0e1826; --mastB:#0b1320; --panelA:#121d2c; --panelB:#0e1723;
+  --inputbg:#0a121c; --chipbg:rgba(0,0,0,.25); --hover:rgba(255,255,255,.035);
+  --grpbg:rgba(245,185,66,.05);
+  --tutbg:#0e2016; --tutglow:rgba(43,212,138,.35);
+  --aubg:rgba(245,185,66,.09);
+}
+:root[data-theme="light"]{
+  --bg:#eef1f6; --panel:#ffffff; --panel2:#f5f7fb; --line:#d9e0ec;
+  --tx:#182430; --dim:#51637a; --faint:#8595a8;
+  --up:#e02e2e; --up2:#c22424; --dn:#0a9e5c; --dn2:#0a8a50;
+  --gold:#c98a10; --cyan:#0b7dc0;
+  --mastA:#ffffff; --mastB:#f2f5fa; --panelA:#ffffff; --panelB:#f7f9fc;
+  --inputbg:#f0f3f8; --chipbg:rgba(0,0,0,.04); --hover:rgba(0,0,0,.04);
+  --grpbg:rgba(200,140,20,.07);
+  --tutbg:#eafff4; --tutglow:rgba(10,158,92,.25);
+  --aubg:rgba(200,140,20,.10);
+}
+*{margin:0;padding:0;box-sizing:border-box;
+  font-family:"Microsoft YaHei","微软雅黑","PingFang SC","Hiragino Sans GB",sans-serif}
+html,body{background:var(--bg)}
+body{color:var(--tx);font-size:13px;overflow-x:hidden;min-height:100vh;transition:background .3s}
+#app{position:relative;z-index:1}
+.mono{font-variant-numeric:tabular-nums;letter-spacing:.3px}
+.up{color:var(--up)} .dn{color:var(--dn)} .gold{color:var(--gold)} .dim{color:var(--dim)}
+button{cursor:pointer;border:none;background:none;color:inherit}
+input{outline:none}
+.masthead{display:flex;align-items:center;gap:20px;flex-wrap:wrap;
+  padding:10px 16px;border-bottom:1px solid var(--line);background:linear-gradient(180deg,var(--mastA),var(--mastB))}
+.seal{width:42px;height:42px;flex:none;display:grid;place-items:center;
+  font-weight:900;font-size:22px;color:#fff;background:linear-gradient(145deg,#e5484d,#9e2227);
+  border-radius:8px;border:2px solid rgba(255,255,255,.18);transform:rotate(-4deg);
+  cursor:pointer;transition:.18s}
+.seal:hover{filter:brightness(1.16);transform:rotate(-4deg) scale(1.07)}
+.seal:active{transform:rotate(-4deg) scale(.97)}
+.brand h1{font-size:20px;font-weight:900;letter-spacing:1px;line-height:1.1}
+.brand .sub{font-size:10px;letter-spacing:3px;color:var(--gold);margin-top:3px}
+.mh-stats{display:flex;gap:22px;flex-wrap:wrap}
+.mh-stat .lb{font-size:10px;color:var(--faint);letter-spacing:2px;margin-bottom:2px}
+.mh-stat .vl{font-size:18px;font-weight:700}
+.mh-stat .sm{font-size:11px}
+.livedot{display:inline-block;width:7px;height:7px;border-radius:50%;background:var(--dn);margin-right:6px}
+.livedot.paused{background:var(--gold)}
+.livedot.closed{background:var(--faint)}
+.mh-right{margin-left:auto;display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.networth .lb{font-size:10px;color:var(--faint);letter-spacing:2px;text-align:right}
+.networth .vl{font-size:21px;font-weight:700;color:var(--gold)}
+.seg{display:flex;border:1px solid var(--line);border-radius:6px;overflow:hidden}
+.seg button{padding:6px 10px;font-size:12px;color:var(--dim);border-right:1px solid var(--line);transition:.15s}
+.seg button:last-child{border-right:none}
+.seg button:hover{color:var(--tx);background:var(--hover)}
+.seg button.on{background:rgba(245,185,66,.15);color:var(--gold)}
+.tbtn{padding:6px 10px;border:1px solid var(--line);border-radius:6px;font-size:12px;color:var(--dim);transition:.15s}
+.tbtn:hover{border-color:var(--gold);color:var(--gold)}
+.ticker{display:flex;align-items:stretch;height:28px;border-bottom:1px solid var(--line);
+  background:var(--panel2);overflow:hidden}
+.ticker-lb{flex:none;display:flex;align-items:center;padding:0 12px;font-size:10px;letter-spacing:2px;
+  color:var(--gold);background:var(--grpbg);border-right:1px solid var(--line);white-space:nowrap}
+.ticker-vp{position:relative;flex:1;overflow:hidden;
+  -webkit-mask-image:linear-gradient(90deg,transparent,#000 2%,#000 98%,transparent);
+  mask-image:linear-gradient(90deg,transparent,#000 2%,#000 98%,transparent)}
+.ticker-run{position:absolute;top:0;left:0;height:100%;display:flex;align-items:center;white-space:nowrap;will-change:transform}
+.ticker-run span{padding-right:40px;font-size:11.5px;color:var(--dim)}
+@keyframes tickMove{from{transform:translateX(0)}to{transform:translateX(-50%)}}
+.layout{display:grid;grid-template-columns:292px minmax(0,1fr) 332px;gap:12px;padding:12px;max-width:1680px;margin:0 auto}
+.panel{background:linear-gradient(180deg,var(--panelA),var(--panelB));border:1px solid var(--line);
+  border-radius:8px;overflow:hidden;display:flex;flex-direction:column}
+.p-head{display:flex;align-items:baseline;gap:8px;padding:10px 12px;border-bottom:1px solid var(--line)}
+.p-head::before{content:'';width:4px;height:12px;background:var(--gold);align-self:center;flex:none}
+.p-head .cn{font-weight:700;font-size:13px}
+.p-head .en{font-size:9px;letter-spacing:3px;color:var(--faint)}
+.p-head .rt{margin-left:auto;font-size:10px;color:var(--faint)}
+.market .list{overflow-y:auto;max-height:calc(100vh - 160px)}
+.grp-head{padding:6px 12px 4px;font-size:10px;letter-spacing:2px;color:var(--gold);
+  background:var(--grpbg);border-bottom:1px solid var(--line);position:sticky;top:0;z-index:2}
+.wl-row{display:grid;grid-template-columns:1fr 72px 74px;gap:6px;align-items:center;
+  padding:8px 10px;border-bottom:1px solid var(--line);cursor:pointer;
+  border-left:2px solid transparent;transition:.15s}
+.wl-row:hover{background:var(--hover)}
+.wl-row.sel{background:rgba(245,185,66,.07);border-left-color:var(--gold)}
+.wl-row.locked{opacity:.38;cursor:not-allowed}
+.wl-row.locked:hover{background:none;border-left-color:transparent}
+.wl-row.au{background:linear-gradient(90deg,var(--aubg),transparent);border-left-color:rgba(245,185,66,.4)}
+.wl-row.au.sel{border-left-color:var(--gold);background:linear-gradient(90deg,rgba(245,185,66,.2),transparent)}
+.wl-nm{font-size:12.5px;font-weight:500;line-height:1.2}
+.wl-row.au .wl-nm{color:var(--gold);font-weight:700}
+.wl-cd{font-size:10px;color:var(--faint)}
+.divtag{display:inline-block;font-size:9px;line-height:13px;padding:0 4px;margin-left:5px;border-radius:3px;
+  background:rgba(245,185,66,.16);color:var(--gold);border:1px solid rgba(245,185,66,.45);vertical-align:1px}
+.wl-px{font-size:13px;font-weight:700;text-align:right}
+.wl-chg{font-size:11px;text-align:right;padding:2px 4px;border-radius:4px}
+.wl-chg.up{background:rgba(255,82,82,.12)} .wl-chg.dn{background:rgba(43,212,138,.10)}
+.wl-chg.limit{font-weight:700;outline:1px solid currentColor}
+.d-top{display:flex;align-items:flex-start;gap:14px;padding:13px 14px 6px;flex-wrap:wrap}
+.d-name{font-size:20px;font-weight:900}
+.d-code{color:var(--faint);font-size:12px;margin-left:8px}
+.tag{font-size:10px;padding:2px 8px;border-radius:3px;border:1px solid var(--line);color:var(--dim);margin-left:6px}
+.tag.div{border-color:rgba(245,185,66,.5);color:var(--gold);background:rgba(245,185,66,.09)}
+.tag.cap{border-color:rgba(100,160,255,.4);color:#7cb8ff;background:rgba(100,160,255,.08)}
+.d-price{margin-left:auto;text-align:right}
+.d-price .big{font-size:32px;font-weight:700;line-height:1}
+.d-price .chg{font-size:13px;margin-top:3px}
+.d-stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(88px,1fr));gap:1px;background:var(--line);
+  border-block:1px solid var(--line);margin-top:8px}
+.d-stat{background:var(--panel2);padding:6px 10px}
+.d-stat .k{font-size:10px;color:var(--faint)} .d-stat .v{font-size:12.5px;margin-top:2px}
+.chart-bar{display:flex;align-items:center;gap:8px;padding:9px 12px 0}
+.zoom-btns{display:flex;gap:4px;margin-left:8px}
+.zoom-btns button{width:24px;height:24px;border:1px solid var(--line);border-radius:4px;font-size:14px;color:var(--dim);display:grid;place-items:center;transition:.15s}
+.zoom-btns button:hover{border-color:var(--gold);color:var(--gold)}
+#chart{width:100%;height:290px;display:block;cursor:crosshair}
+.ma-legend{font-size:10px;color:var(--faint);margin-left:auto;display:flex;gap:12px}
+.ma-legend i{display:inline-block;width:10px;height:2px;margin-right:4px;vertical-align:middle}
+.trade{padding:12px 14px;border-top:1px solid var(--line)}
+.phase-note{font-size:11px;padding:6px 10px;border-radius:5px;margin-bottom:10px;
+  background:rgba(245,185,66,.08);border:1px dashed rgba(245,185,66,.3);color:var(--gold)}
+.tlabel{font-size:11px;color:var(--dim);margin-bottom:6px}
+.qty-row{display:flex;gap:6px}
+.qbtn{width:36px;height:36px;border:1px solid var(--line);border-radius:6px;font-size:16px;color:var(--dim);transition:.15s}
+.qbtn:hover{border-color:var(--gold);color:var(--gold)}
+#qtyInput{flex:1;background:var(--inputbg);border:1px solid var(--line);border-radius:6px;color:var(--tx);
+  font-size:16px;text-align:center;padding:7px;transition:.15s}
+#qtyInput:focus{border-color:var(--gold)}
+.chips{display:flex;gap:6px;margin-top:8px;flex-wrap:wrap}
+.chips .lb{font-size:10px;color:var(--faint);align-self:center}
+.chip{font-size:11px;padding:3px 10px;border:1px solid var(--line);border-radius:20px;color:var(--dim);transition:.15s}
+.chip:hover{transform:translateY(-1px)}
+.chip.b:hover{border-color:var(--up);color:var(--up)}
+.chip.s:hover{border-color:var(--dn);color:var(--dn)}
+.trade-info{font-size:11px;color:var(--dim);line-height:1.9;margin:10px 0;padding:8px 10px;
+  background:var(--chipbg);border-radius:6px}
+.trade-btns{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.btn-buy,.btn-sell{padding:11px;border-radius:6px;font-size:15px;font-weight:900;letter-spacing:6px;color:#fff;transition:.15s}
+.btn-buy{background:linear-gradient(145deg,#ef5350,#b32b30)}
+.btn-sell{background:linear-gradient(145deg,#26c281,#128a56)}
+.btn-buy:hover,.btn-sell:hover{transform:translateY(-2px);filter:brightness(1.12)}
+#preBox{margin-top:10px}
+.pre-row{display:flex;gap:8px;align-items:center;font-size:11px;padding:5px 8px;border-bottom:1px solid var(--line)}
+.pre-row button{margin-left:auto;color:var(--faint);font-size:14px;padding:0 4px}
+.pre-row button:hover{color:var(--up)}
+.asset{padding:12px 14px;border-bottom:1px solid var(--line)}
+.asset .nw{font-size:26px;font-weight:700;color:var(--gold)}
+.asset .rows{display:flex;justify-content:space-between;font-size:11px;color:var(--dim);margin-top:6px;flex-wrap:wrap;gap:4px}
+.chiplet{font-size:11px;padding:1px 7px;border-radius:4px}
+.chiplet.up{background:rgba(255,82,82,.12)} .chiplet.dn{background:rgba(43,212,138,.12)}
+.rankline{margin-top:8px;font-size:11px}
+.regime-line{margin-top:5px;font-size:10.5px;color:var(--faint);text-align:center}
+.action-zone{padding:12px 14px;border-bottom:1px solid var(--line)}
+#mainActionBtn{width:100%;padding:13px;border-radius:7px;font-size:16px;font-weight:900;letter-spacing:4px;
+  color:#10151c;background:linear-gradient(145deg,#ffd45e,#e89b2d);transition:.15s}
+#mainActionBtn:hover:not(:disabled){transform:translateY(-2px);filter:brightness(1.08)}
+#mainActionBtn:disabled{background:#26364c;color:var(--faint);cursor:default}
+.main-hint{font-size:10px;color:var(--faint);text-align:center;margin-top:6px}
+.gossip-tip{font-size:10px;color:var(--faint);text-align:center;margin-top:8px}
+.event-zone{padding:10px 14px;border-bottom:1px solid var(--line)}
+.ez-title{font-size:10px;letter-spacing:2px;color:var(--gold);margin:2px 0 6px}
+.ez-item{font-size:12px;padding:7px 9px;border-radius:5px;margin-bottom:6px;line-height:1.6}
+.ez-item.good{background:rgba(255,82,82,.08);border:1px dashed rgba(255,82,82,.4)}
+.ez-item.bad{background:rgba(43,212,138,.08);border:1px dashed rgba(43,212,138,.4)}
+.evlink{color:var(--cyan);cursor:pointer;font-weight:700}
+.evlink:hover{text-decoration:underline}
+.ipo-box{margin:2px 0 8px}
+#ipoQty{flex:1;background:var(--inputbg);border:1px solid var(--line);border-radius:6px;color:var(--tx);
+  font-size:14px;text-align:center;padding:5px}
+.tabs-h{display:flex;border-bottom:1px solid var(--line)}
+.tabs-h button{flex:1;padding:9px 2px;font-size:12px;color:var(--faint);border-bottom:2px solid transparent;transition:.15s}
+.tabs-h button:hover{color:var(--tx)}
+.tabs-h button.on{color:var(--gold);border-bottom-color:var(--gold);font-weight:700}
+.pane{overflow-y:auto;height:336px;display:none}
+.pane.on{display:block}
+.news-it{padding:8px 12px;border-bottom:1px solid var(--line)}
+.news-it .tm{font-size:10px;color:var(--faint);margin-right:6px}
+.ntag{font-size:10px;padding:1px 6px;border-radius:3px;margin-right:6px;font-weight:700}
+.ntag.good{background:rgba(255,82,82,.15);color:var(--up2)}
+.ntag.bad{background:rgba(43,212,138,.15);color:var(--dn2)}
+.ntag.mkt{background:rgba(90,209,255,.13);color:var(--cyan)}
+.ntag.board{background:rgba(245,185,66,.16);color:var(--gold)}
+.ntag.fun{background:var(--chipbg);color:var(--dim)}
+.news-it .tx{font-size:12px;line-height:1.55}
+.hold-row{display:grid;grid-template-columns:1fr auto auto;gap:4px 10px;padding:8px 12px;border-bottom:1px solid var(--line);cursor:pointer}
+.hold-row:hover{background:var(--hover)}
+.hold-row.au{background:linear-gradient(90deg,var(--aubg),transparent)}
+.hold-row .nm{font-size:12px;font-weight:500}
+.hold-row .qty{font-size:10px;color:var(--faint)}
+.hold-row .px{font-size:12px;text-align:right}
+.hold-row .pnl{font-size:12px;text-align:right;font-weight:700}
+.tr-row{display:flex;gap:8px;padding:6px 12px;border-bottom:1px solid var(--line);font-size:11px}
+.tr-row .tm{color:var(--faint)}
+.empty{padding:30px;text-align:center;color:var(--faint);font-size:12px}
+.rumor-box{padding:14px}
+#btnRumor{width:100%;padding:10px;border-radius:6px;font-weight:700;letter-spacing:2px;
+  background:linear-gradient(145deg,#3a2f55,#241d38);border:1px solid #6b5aa0;color:#cbb8ff;margin:10px 0;transition:.15s}
+#btnRumor:hover:not(:disabled){filter:brightness(1.2)}
+#btnRumor:disabled{opacity:.45;cursor:default}
+.rumor-it{font-size:12px;line-height:1.6;padding:8px 10px;margin-top:8px;
+  background:rgba(107,90,160,.1);border-left:3px solid #6b5aa0;border-radius:4px}
+.rumor-it .tm{font-size:10px;color:var(--faint);display:block;margin-bottom:2px}
+footer{display:flex;justify-content:center;gap:24px;padding:10px;font-size:11px;color:var(--faint);flex-wrap:wrap}
+footer .fver{cursor:pointer;color:var(--dim);border-bottom:1px dashed var(--line)}
+footer .fver:hover{color:var(--gold);border-bottom-color:var(--gold)}
+kbd{font-size:10px;border:1px solid var(--line);border-bottom-width:2px;border-radius:4px;padding:1px 6px;background:var(--panel2)}
+#toasts{position:fixed;top:100px;right:14px;z-index:50;display:flex;flex-direction:column;gap:8px}
+.toast{min-width:220px;max-width:320px;padding:10px 14px;border-radius:6px;font-size:12px;
+  background:var(--panel);border:1px solid var(--line);border-left:3px solid var(--cyan);animation:tIn .3s ease}
+.toast.ok{border-left-color:var(--dn)} .toast.err{border-left-color:var(--up)}
+.toast.achv{border-left-color:var(--gold)}
+.toast.out{opacity:0;transition:.3s}
+@keyframes tIn{from{opacity:0;transform:translateX(30px)}to{opacity:1;transform:none}}
+#dayBanner{position:fixed;inset:0;display:grid;place-items:center;pointer-events:none;z-index:40;opacity:0}
+#dayBanner .in{font-size:42px;font-weight:900;letter-spacing:8px;color:var(--gold);text-shadow:0 0 40px rgba(245,185,66,.5)}
+#dayBanner.show{animation:banner 1.5s ease}
+@keyframes banner{0%{opacity:0;transform:scale(.9)}18%{opacity:1;transform:scale(1)}75%{opacity:1}100%{opacity:0}}
+#nightVeil{position:fixed;inset:0;background:#04070c;z-index:35;opacity:0;pointer-events:none;
+  transition:opacity .8s ease}
+#nightVeil.on{opacity:1;pointer-events:auto}
+#nightText{position:absolute;top:36%;left:50%;transform:translateX(-50%);white-space:nowrap;
+  color:var(--gold);font-size:19px;font-weight:700;letter-spacing:6px;opacity:0;
+  text-shadow:0 0 30px rgba(245,185,66,.55);transition:opacity .5s ease .25s}
+#nightVeil.on #nightText{opacity:1}
+/* ---- ★ 右下角难度事件坞（房租 / 啃老 / 爸爸来电） ---- */
+#perkDock{position:fixed;right:16px;bottom:16px;z-index:30;display:none;
+  flex-direction:column;gap:10px;align-items:flex-end}
+.pk{display:flex;align-items:center;gap:9px;padding:9px 13px;border-radius:10px;text-align:left;
+  background:linear-gradient(180deg,var(--panelA),var(--panelB));border:1px solid var(--line);
+  color:var(--dim);box-shadow:0 6px 22px rgba(0,0,0,.35);transition:.15s;min-width:178px}
+.pk:hover:not(:disabled){transform:translateY(-2px);border-color:var(--gold);color:var(--tx)}
+.pk:disabled{opacity:.6;cursor:default}
+.pk .pk-ic{font-size:20px;line-height:1;flex:none}
+.pk .pk-tx{display:flex;flex-direction:column;gap:2px;min-width:0}
+.pk .pk-tx b{font-size:12px;font-weight:700;color:var(--tx);letter-spacing:.5px}
+.pk .pk-tx i{font-size:10px;font-style:normal;color:var(--faint);white-space:nowrap}
+.pk.ready{border-color:rgba(245,185,66,.55);background:linear-gradient(180deg,rgba(245,185,66,.14),var(--panelB))}
+.pk.ready .pk-tx b,.pk.ready .pk-tx i{color:var(--gold)}
+.pk.urgent{border-color:rgba(255,82,82,.75);animation:pkPulse 1.5s ease-in-out infinite}
+.pk.urgent .pk-tx b,.pk.urgent .pk-tx i{color:var(--up2)}
+.pk.warn{border-color:var(--up);background:linear-gradient(180deg,rgba(255,82,82,.2),var(--panelB))}
+.pk.warn .pk-tx b,.pk.warn .pk-tx i{color:var(--up)}
+.pk.done{opacity:.5}
+@keyframes pkPulse{0%,100%{box-shadow:0 0 0 0 rgba(255,82,82,.5)}50%{box-shadow:0 0 0 9px rgba(255,82,82,0)}}
+#boardPanel{position:fixed;top:96px;right:22px;z-index:70;width:330px;display:none;
+  background:var(--panel);border:1px solid var(--gold);border-radius:10px;
+  box-shadow:0 10px 44px rgba(0,0,0,.5)}
+#boardPanel.show{display:block;animation:mIn .3s ease}
+.bp-head{display:flex;align-items:center;gap:8px;padding:9px 12px;cursor:move;user-select:none;
+  touch-action:none;
+  border-bottom:1px solid var(--line);background:var(--grpbg);border-radius:10px 10px 0 0}
+.bp-head .tt{font-size:12.5px;font-weight:900;color:var(--gold);letter-spacing:1px}
+.bp-head .hint{font-size:9px;color:var(--faint)}
+.bp-head .cl{margin-left:auto;font-size:17px;line-height:1;color:var(--faint);cursor:pointer;padding:0 2px}
+.bp-head .cl:hover{color:var(--up)}
+.bp-body{padding:6px 12px 12px;max-height:54vh;overflow-y:auto}
+.bp-sec{font-size:10px;letter-spacing:2px;margin:9px 0 3px;font-weight:700}
+.bp-row{display:grid;grid-template-columns:16px 1fr 66px;gap:6px;align-items:center;
+  padding:5px 4px;border-bottom:1px solid var(--line);font-size:12px}
+.bp-row:hover{background:var(--hover)}
+.bp-rk{color:var(--faint);font-weight:700;font-size:11px}
+.bp-nm{cursor:pointer;color:var(--cyan);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.bp-nm:hover{text-decoration:underline}
+.bp-chg{text-align:right;font-weight:700}
+.overlay{position:fixed;inset:0;background:rgba(5,9,14,.8);z-index:60;display:grid;place-items:center}
+.overlay.hidden{display:none}
+.modal{width:min(440px,92vw);background:var(--panel);border:1px solid var(--line);border-radius:10px;
+  padding:26px;animation:mIn .3s ease;max-height:92vh;overflow-y:auto}
+.modal.wide{width:min(660px,94vw)}
+@keyframes mIn{from{opacity:0;transform:translateY(24px) scale(.96)}to{opacity:1;transform:none}}
+.modal h2{font-size:20px;font-weight:900}
+.modal .msub{font-size:12px;color:var(--dim);margin-top:4px}
+.receipt{border:1px dashed rgba(245,185,66,.4);border-radius:6px;padding:14px;margin:14px 0;font-size:12px;line-height:2}
+.receipt .rl{display:flex;justify-content:space-between;gap:10px}
+.receipt .rl b{color:var(--gold);text-align:right}
+.receipt .dtl{font-size:10.5px;color:var(--faint);line-height:1.6;margin:-9px 0 9px;letter-spacing:0}
+.modal ul{margin:10px 0 4px 18px;font-size:12px;color:var(--dim);line-height:2}
+.mbtns{display:flex;gap:10px;margin-top:18px}
+.mbtn{flex:1;padding:11px;border-radius:6px;font-weight:700;font-size:14px;transition:.15s;letter-spacing:2px}
+.mbtn.pri{background:linear-gradient(145deg,#ef5350,#b32b30);color:#fff}
+.mbtn.ghost{border:1px solid var(--line);color:var(--dim)}
+.mbtn:hover{transform:translateY(-2px);filter:brightness(1.1)}
+/* ---- ★ 主界面 / 难度选择 ---- */
+.mm-hero{text-align:center;margin-bottom:6px}
+.mm-hero .lg{font-size:38px;line-height:1}
+.mm-hero h2{font-size:24px;margin-top:6px;letter-spacing:2px}
+.mm-hero .sb{font-size:10.5px;color:var(--gold);letter-spacing:3px;margin-top:5px}
+.mm-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin:16px 0 4px}
+.mm-card{padding:16px 14px;border-radius:10px;border:1px solid var(--line);cursor:pointer;
+  background:linear-gradient(180deg,var(--panelA),var(--panelB));text-align:center;transition:.18s}
+.mm-card:hover{transform:translateY(-3px);border-color:var(--gold);filter:brightness(1.08)}
+.mm-card .ic{font-size:30px;line-height:1}
+.mm-card .tt{font-size:15px;font-weight:900;margin-top:7px;letter-spacing:1px}
+.mm-card .ds{font-size:11px;color:var(--dim);line-height:1.75;margin-top:6px}
+.mm-card .tg{display:inline-block;margin-top:10px;font-size:10px;padding:2px 9px;border-radius:20px;
+  border:1px solid var(--line);color:var(--faint)}
+.mm-card .tg.hot{border-color:rgba(43,212,138,.5);color:var(--dn);background:rgba(43,212,138,.1)}
+.mm-card .tg.soon{border-color:rgba(245,185,66,.4);color:var(--gold);background:rgba(245,185,66,.08)}
+.mm-card.off{opacity:.66}
+.df-list{display:flex;flex-direction:column;gap:9px;margin:13px 0 2px;max-height:54vh;overflow-y:auto;padding-right:4px}
+.df-card{display:flex;gap:12px;align-items:flex-start;padding:12px 13px;border-radius:9px;cursor:pointer;
+  border:1px solid var(--line);background:var(--chipbg);text-align:left;transition:.15s;width:100%}
+.df-card:hover{border-color:var(--gold);transform:translateX(3px);background:var(--grpbg)}
+.df-card .ic{font-size:24px;flex:none;width:30px;text-align:center;line-height:1.2}
+.df-card .bd{flex:1;min-width:0}
+.df-card .nm{font-size:14px;font-weight:900;letter-spacing:1px}
+.df-card .nm .tg{font-size:9px;font-weight:700;margin-left:7px;padding:1px 7px;border-radius:20px;
+  border:1px solid var(--line);color:var(--faint);vertical-align:2px}
+.df-card .mt{font-size:11px;color:var(--gold);margin-top:4px}
+.df-card ul{margin:5px 0 0 15px;font-size:11px;color:var(--dim);line-height:1.75}
+@media(max-width:640px){.mm-grid{grid-template-columns:1fr}}
+/* ---- 关于 / 更新日志 弹窗 ---- */
+.about-logo{font-size:34px;text-align:center;margin:2px 0 6px}
+.about-name{font-size:16px;font-weight:900;text-align:center;letter-spacing:1px}
+.about-ver{font-size:11px;text-align:center;color:var(--gold);letter-spacing:2px;margin-top:3px}
+.about-cr{font-size:11.5px;text-align:center;color:var(--dim);line-height:2;margin-top:12px}
+.about-rights{font-size:11px;text-align:center;color:var(--faint);letter-spacing:1px}
+.about-extra{font-size:11px;color:var(--faint);text-align:center;margin-top:8px;line-height:1.7}
+.cl-body{max-height:52vh;overflow-y:auto;padding-right:4px;margin:12px 0 2px}
+.cl-ver{padding:8px 11px;margin-bottom:8px;border-left:3px solid var(--line);
+  background:var(--chipbg);border-radius:0 5px 5px 0}
+.cl-ver.cur{border-left-color:var(--gold);background:var(--grpbg)}
+.cl-vh{font-size:12.5px;font-weight:900;color:var(--gold)}
+.cl-vh .curtag{font-size:9px;font-weight:700;margin-left:6px;padding:1px 6px;border-radius:3px;
+  background:rgba(245,185,66,.18);border:1px solid rgba(245,185,66,.45);color:var(--gold);vertical-align:1px}
+.cl-vd{font-size:10px;color:var(--faint);margin-left:6px;font-weight:400}
+.cl-ver ul{margin:6px 0 0 16px;font-size:11.5px;color:var(--dim);line-height:1.85}
+#tutBar{position:fixed;bottom:22px;left:50%;transform:translateX(-50%);z-index:95;
+  background:var(--tutbg);border:2px solid var(--dn);border-radius:12px;padding:13px 22px;
+  max-width:560px;box-shadow:0 6px 30px var(--tutglow);font-size:13px;line-height:1.6}
+#tutBar b{color:var(--dn2)}
+::-webkit-scrollbar{width:8px}::-webkit-scrollbar-thumb{background:var(--line);border-radius:4px}
+@media(max-width:1200px){
+  .layout{grid-template-columns:248px minmax(0,1fr)}
+  .right{grid-column:1/-1;display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:12px;align-items:start}
+}
+@media(max-width:820px){.layout{grid-template-columns:1fr}.market .list{max-height:280px}
+  #perkDock{right:8px;bottom:8px}.pk{min-width:150px;padding:7px 10px}}
+.cheat-panel{position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);
+  z-index:100;background:#1a1028;border:2px solid #8b5cf6;border-radius:12px;
+  padding:0 0 16px;min-width:372px;max-width:94vw;box-shadow:0 0 40px rgba(139,92,246,.35)}
+.cheat-panel h3{color:#c4b5fd;font-size:14px;padding:13px 18px;margin:0;cursor:move;user-select:none;
+  touch-action:none;
+  border-bottom:1px solid #4c1d95;background:rgba(139,92,246,.14);border-radius:10px 10px 0 0}
+.cheat-inner{padding:16px 18px 0}
+.cheat-section{margin-bottom:14px}
+.cheat-label{font-size:11px;color:#a78bfa;margin-bottom:6px}
+.cheat-row{display:flex;gap:6px;margin-bottom:6px;flex-wrap:wrap}
+.cheat-row button{padding:5px 10px;border-radius:4px;font-size:12px;background:#2d2050;border:1px solid #7c3aed;color:#ddd6fe;transition:.15s}
+.cheat-row button:hover{background:#4c1d95}
+.cheat-row input,.cheat-row select{background:#12081f;border:1px solid #6d28d9;border-radius:4px;color:#e9d5ff;padding:5px 8px;font-size:12px}
+.cheat-row select{flex:1}
+.cheat-row input{width:90px}
+</style>
+</head>
+<body>
+<div id="app">
+<header class="masthead">
+  <div class="seal" id="sealBtn" onclick="showAbout()" title="关于本作">股</div>
+  <div class="brand"><h1>韭菜翻身记</h1><div class="sub" id="brandSub">单机炒股模拟器 · 纯属虚构</div></div>
+  <div class="mh-stats">
+    <div class="mh-stat"><div class="lb">韭菜综合指数</div><div class="vl" id="mhIndex">--</div><div class="sm mono" id="mhIndexChg">--</div></div>
+    <div class="mh-stat"><div class="lb">大盘风向</div><div class="vl" id="mhRegime" style="font-size:15px">--</div><div class="sm mono dim" id="mhRegimeSub">--</div></div>
+    <div class="mh-stat"><div class="lb">可用资金</div><div class="vl" id="mhCash" style="color:var(--cyan)">¥0</div><div class="sm dim" id="mhCashSub">--</div></div>
+    <div class="mh-stat"><div class="lb">交易日</div><div class="vl" id="mhDay">第1日</div><div class="sm mono dim" id="mhClock">盘前</div></div>
+    <div class="mh-stat"><div class="lb">状态</div><div class="vl" style="font-size:14px"><span class="livedot" id="liveDot"></span><span id="mhState">盘前</span></div><div class="sm dim">红涨 · 绿跌</div></div>
+  </div>
+  <div class="mh-right">
+    <div class="networth"><div class="lb">总资产</div><div class="vl" id="mhNet">¥0</div></div>
+    <div class="seg" id="speedSeg">
+      <button id="btnPause" title="暂停/继续">⏸</button>
+      <button data-sp="1" class="on">1×</button><button data-sp="2">2×</button>
+      <button data-sp="4">4×</button><button data-sp="16">16×</button>
+    </div>
+    <button class="tbtn" id="btnChangelog" onclick="showChangelog()" title="版本更新日志">📜</button>
+    <button class="tbtn" onclick="showMainMenu()" title="返回主界面">🏠</button>
+    <button class="tbtn" onclick="reopenBoard()" title="查看最近龙虎榜">📊</button>
+    <button class="tbtn" id="btnTheme" onclick="toggleTheme()" title="切换主题">☀️</button>
+    <button class="tbtn" onclick="exportSave()" title="导出存档">⬇</button>
+    <button class="tbtn" onclick="$('importFile').click()" title="导入存档">⬆</button>
+    <input type="file" id="importFile" accept=".txt,.json" style="display:none" onchange="importSave(this)">
+    <button class="tbtn" onclick="showSettle()">🧾 结算</button>
+    <button class="tbtn" onclick="confirmRestart()">↺ 重开</button>
+    <button class="tbtn" onclick="openTutorial()" title="新手教程">🎓</button>
+  </div>
+</header>
+<div class="ticker">
+  <div class="ticker-lb">📰 滚动快讯</div>
+  <div class="ticker-vp"><div class="ticker-run" id="tickerRun"><span>加载中…</span></div></div>
+</div>
+<main class="layout">
+  <section class="panel market">
+    <div class="p-head"><span class="cn">行情报价</span><span class="en">MARKET</span><span class="rt" id="wlLimit">涨停 0 / 跌停 0</span></div>
+    <div class="list" id="wlList"></div>
+  </section>
+  <section class="panel detail">
+    <div class="d-top">
+      <div><span class="d-name" id="dName">--</span><span class="d-code" id="dCode"></span><span class="tag" id="dSector"></span><span class="tag cap" id="dCapTag" style="display:none"></span><span class="tag div" id="dDivTag" style="display:none"></span><span class="tag" id="dLimitTag" style="display:none"></span></div>
+      <div class="d-price"><div class="big" id="dPrice">--</div><div class="chg" id="dChg">--</div></div>
+    </div>
+    <div class="d-stats" id="dStats"></div>
+    <div class="chart-bar">
+      <div class="seg" id="chartSeg"><button data-m="k" class="on">日K</button><button data-m="line">分时</button></div>
+      <div class="zoom-btns"><button onclick="panChart(-1)" title="左移">◀</button><button onclick="zoomChart(1)" title="缩小">−</button><button onclick="zoomChart(-1)" title="放大">＋</button><button onclick="panChart(1)" title="右移">▶</button></div>
+      <div class="ma-legend"><span><i style="background:var(--gold)"></i>MA5</span><span><i style="background:var(--cyan)"></i>MA10</span></div>
+    </div>
+    <canvas id="chart"></canvas>
+    <div class="trade">
+      <div class="phase-note" id="phaseNote"></div>
+      <div class="tlabel" id="qtyLabel">委托数量（1 手 = 100 股 · 本作 T+0 随时可卖）</div>
+      <div class="qty-row">
+        <button class="qbtn" onclick="stepQty(-1)">−</button>
+        <input id="qtyInput" type="number" min="0" step="100" value="100">
+        <button class="qbtn" onclick="stepQty(1)">＋</button>
+      </div>
+      <div class="chips" id="buyChips"></div>
+      <div class="chips" id="sellChips"></div>
+      <div class="trade-info" id="tradeInfo"></div>
+      <div class="trade-btns" id="actionBtns"></div>
+      <div id="preBox"><div class="tlabel" style="margin-top:10px">📋 预下单队列 <span class="dim">（开盘时按开盘价成交）</span></div><div id="preList"></div></div>
+    </div>
+  </section>
+  <aside class="right">
+    <section class="panel">
+      <div class="p-head"><span class="cn">我的账户</span><span class="en">PORTFOLIO</span></div>
+      <div class="asset">
+        <div class="nw" id="aNet">¥0</div>
+        <div class="rows">
+          <span>可用资金 <b id="aCash" style="color:var(--tx)">--</b></span>
+          <span>持仓市值 <b id="aMv" style="color:var(--tx)">--</b></span>
+          <span id="aFrozenWrap" style="display:none">冻结申购 <b id="aFrozen" style="color:var(--gold)">--</b></span>
+          <span>今日 <span class="chiplet" id="aToday">--</span></span>
+        </div>
+        <div class="rankline"><span id="rankName" class="gold">--</span></div>
+        <div class="regime-line" id="regimeTip">--</div>
+      </div>
+      <div class="action-zone">
+        <button id="mainActionBtn" onclick="mainAction()">🔔 开始交易</button>
+        <div class="main-hint" id="mainHint"></div>
+        <div class="gossip-tip" id="cybTip"></div>
+        <div class="gossip-tip" id="gossipTip"></div>
+      </div>
+      <div class="event-zone" id="eventZone" style="display:none"></div>
+    </section>
+    <section class="panel">
+      <div class="tabs-h">
+        <button data-t="news" class="on">市场快讯</button>
+        <button data-t="hold">我的持仓</button>
+        <button data-t="trade">成交记录</button>
+        <button data-t="rumor" id="tabRumor" style="display:none">小道消息</button>
+      </div>
+      <div class="pane on" id="paneNews"></div>
+      <div class="pane" id="paneHold"><div class="empty">暂无持仓</div></div>
+      <div class="pane" id="paneTrade"><div class="empty">还没有成交记录</div></div>
+      <div class="pane" id="paneRumor">
+        <div class="rumor-box">
+          <p class="dim" style="font-size:12px;line-height:1.8">🕵️ 营业部后门渠道。<b style="color:#cbb8ff">真假参半</b>，2 个交易日后自动揭晓真伪。</p>
+          <button id="btnRumor" onclick="buyRumor()">花费 ¥10,000 买一条小道消息</button>
+          <div id="rumorList"></div>
+        </div>
+      </div>
+    </section>
+  </aside>
+</main>
+<footer>
+  <span><kbd>Space</kbd> 暂停/继续</span>
+  <span>🪙 黄金避险 · 逆大盘而行</span>
+  <span>💰 带「息」标记为派息股 · 永不退市</span>
+  <span>新股可打新 · 问题股连续跌停后退市</span>
+  <span id="footGoal">🎯 目标：200 万封神</span>
+  <span class="fver" id="footVer" onclick="showChangelog()" title="点击查看更新日志">--</span>
+</footer>
+</div>
+<div id="toasts"></div>
+<div id="nightVeil"><div id="nightText"></div></div>
+<div id="dayBanner"><div class="in" id="bannerText"></div></div>
+<div id="perkDock"></div>
+<div id="tutBar" style="display:none"><span id="tutText"></span></div>
+<div id="boardPanel">
+  <div class="bp-head" id="boardHead">
+    <span class="tt" id="boardTitle">📊 收盘龙虎榜</span>
+    <span class="hint">可拖动</span>
+    <span class="cl" onclick="closeBoard()" title="关闭">×</span>
+  </div>
+  <div class="bp-body" id="boardBody"></div>
+</div>
+<div id="cheatPanel" class="cheat-panel" style="display:none">
+  <h3 id="cheatHead">🔧 作弊面板 · 拖动标题栏移动 · F9/Esc 关闭</h3>
+  <div class="cheat-inner">
+  <div class="cheat-section">
+    <div class="cheat-label">💰 可用资金调整</div>
+    <div class="cheat-row">
+      <button onclick="cheatCash(-100000)">−10万</button><button onclick="cheatCash(-10000)">−1万</button>
+      <button onclick="cheatCash(10000)">+1万</button><button onclick="cheatCash(100000)">+10万</button>
+      <button onclick="cheatCash(1000000)">+100万</button>
+    </div>
+    <div class="cheat-row">
+      <input id="cheatCashInput" type="number" placeholder="自定义金额" style="flex:1;width:auto">
+      <button onclick="cheatCash(+$('cheatCashInput').value||0)">执行</button>
+    </div>
+  </div>
+  <div class="cheat-section">
+    <div class="cheat-label">📈 修改价格（含黄金）</div>
+    <div class="cheat-row">
+      <select id="cheatStockSel"></select>
+      <input id="cheatPriceInput" type="number" placeholder="目标价" step="0.01" style="width:90px">
+      <button onclick="cheatPrice()">设置</button>
+    </div>
+    <div class="cheat-row">
+      <button onclick="cheatPriceMul(1.1)">×1.1</button><button onclick="cheatPriceMul(1.5)">×1.5</button>
+      <button onclick="cheatPriceMul(2)">×2</button><button onclick="cheatPriceMul(0.5)">×0.5</button>
+      <button onclick="cheatPriceMul(0.1)">×0.1</button>
+    </div>
+  </div>
+  <div class="cheat-section">
+    <div class="cheat-label">🎲 随机添加股票（场上上限 <span id="cheatCapTxt">45</span> 只）</div>
+    <div class="cheat-row">
+      <button onclick="cheatListStock()">随机上市 1 只</button>
+      <button onclick="cheatListStock();cheatListStock();cheatListStock()">随机上市 3 只</button>
+      <button onclick="cheatListDiv()">上市 1 只派息股</button>
+    </div>
+    <div class="cheat-row" style="font-size:11px;color:#a78bfa" id="cheatCountTxt">当前在场：--</div>
+  </div>
+  <div class="cheat-section">
+    <div class="cheat-label">⏩ 时间作弊</div>
+    <div class="cheat-row">
+      <button onclick="cheatSkipDay()">快进到当天闭市</button>
+      <button onclick="cheatJumpDay()">快进 30 天（测试难度事件）</button>
+      <button onclick="cheatJumpDay(60)">快进 60 天</button>
+    </div>
+  </div>
+  <div class="cheat-section">
+    <div class="cheat-label">💼 持仓操作（针对左侧当前选中标的）</div>
+    <div class="cheat-row">
+      <button onclick="cheatGiveStock()">选中股 +1万股 / 黄金 +100克</button>
+      <button onclick="cheatLiquidate()">一键清仓变现</button>
+    </div>
+  </div>
+  <div class="cheat-section">
+    <div class="cheat-label">🎲 强制触发事件</div>
+    <div class="cheat-row">
+      <button onclick="cheatForceDelist()">排期退市</button>
+      <button onclick="cheatForceIPO()">排期打新</button>
+      <button onclick="cheatFreeRumor()">免费小道消息</button>
+    </div>
+  </div>
+  <div class="cheat-section">
+    <div class="cheat-label">🌡️ 大盘情绪（regime · 影响全场漂移与金价）</div>
+    <div class="cheat-row">
+      <button onclick="cheatRegime(0.5)">🧊 0.5 极弱</button>
+      <button onclick="cheatRegime(0.75)">📉 0.75 偏空</button>
+      <button onclick="cheatRegime(1)">➖ 1.0 中性</button>
+      <button onclick="cheatRegime(1.3)">📈 1.3 偏多</button>
+      <button onclick="cheatRegime(1.7)">🔥 1.7 极强</button>
+    </div>
+  </div>
+  <div class="cheat-section">
+    <div class="cheat-label">🔓 权限解锁</div>
+    <div class="cheat-row">
+      <button onclick="cheatUnlockAll()">解锁创业板 + 小道消息</button>
+    </div>
+  </div>
+  <div class="cheat-section">
+    <div class="cheat-label">🎭 难度事件控制（右下角图标）</div>
+    <div class="cheat-row">
+      <button onclick="cheatPerkDue('A')">事件A 立即到期</button>
+      <button onclick="cheatPerkDue('B')">事件B 立即到期</button>
+      <button onclick="cheatRetireDad()">解除来电骚扰</button>
+    </div>
+  </div>
+  <div class="cheat-section">
+    <div class="cheat-label">🏁 结局测试</div>
+    <div class="cheat-row">
+      <button onclick="cheatWin()">触发通关弹窗</button>
+      <button onclick="cheatDead()">触发破产结局</button>
+    </div>
+  </div>
+  </div>
+</div>
+<div class="overlay hidden" id="overlay"><div class="modal" id="modalBox"></div></div>
+
+<script>
+/* ╔══════════════════════════════════════════════════════════════════════╗
+   ║  ★★★ 关于弹窗 · 版权信息 —— 自定义区（直接改下面几行字符串即可）★★★  ║
+   ╚══════════════════════════════════════════════════════════════════════╝ */
+const APP_LOGO   = '📈';
+const APP_NAME   = '韭菜翻身记-单机炒股模拟器';
+const APP_VERSION= '031260920iv';                           // ← 版本号
+const APP_COPYRIGHT = 'copyright©2026 囤囤鼠';
+const APP_RIGHTS    = '版权所有 · 仿冒必究';
+const APP_EXTRA     = '';
+
+/* ╔══════════════════════════════════════════════════════════════════════╗
+   ║  ★★★ 版本更新日志 —— 新版本往数组【最前面】加一条 ★★★              ║
+   ╚══════════════════════════════════════════════════════════════════════╝ */
+const CHANGELOG=[
+ {v:'031260920iv', date:'2026-09-17', title:'用户反馈修复 + 体验优化', items:[
+   '修复：小道消息同一天对同一只股票重复生成矛盾消息的问题（新增去重过滤）',
+   '修复：高价股（醉仙酒业/天工智芯）指数级暴涨导致玩家自动获胜（引入均值回归机制，价格偏离初始价越远回归力越强）',
+   '优化：退市事件频率过高（事件间隔 2→3 天，连续退市后下次更倾向新股上市）',
+   '优化：IPO 收益根据难度调节（简单 85 折 / 中等 8 折 / 困难 75 折+10%破发 / 绝望 7 折+20%破发）',
+   '优化：日K线图新增放大/缩小/左移/右移按钮，支持键盘方向键平移浏览历史K线，右上角显示上市天数及近90/30/7天涨跌幅',
+   '优化：涨跌停频率提升（基础波动率全面上调 + 新增随机冲击机制，3%概率触发3~5倍波动持续8~20个tick）',
+   '优化：新闻系统重平衡（事件频率 5.5%→13%，利好/利空/政策/杂谈均大幅增加，市场信息更丰富）',
+   '新增：市值系统（每只股票含总股本，市值=价格×股本；大盘股波动更低、小盘股波动更高，新闻冲击也按市值缩放；详情页显示市值标签）']},
+ {v:'024260917tiv', date:'2026-09-17', title:'Asset 抽象重构版', items:[
+   '重构：引入统一 Asset 接口，黄金与股票共享数据结构（price/prevClose/open/high/low/candles/todaySeries 等），消除大量 GOLD_CODE 特殊分支',
+   '重构：合并 doBuy/doBuyGold、doSell/doSellGold、preOrder/preOrderGold、updateDetail/updateGoldDetail、updateTradePanel/updateTradePanelGold 等重复函数对',
+   '重构：提取 presimAsset() 统一预模拟函数，提取 generateOpen() 统一开盘价生成逻辑',
+   '重构：全局变量 S→state、G→gold，代码可读性大幅提升',
+   '重构：提取 createStock() 工厂函数，简化 makePool 中的对象创建',
+   '修缮：存档格式保持向后兼容，旧存档无缝加载']},
+ {v:'023260913tv', date:'2026-09-13', title:'绝望加倍 + 稳定性修缮版', items:[
+   '修正：简单难度 🧧 补助规则文案 10 万 → 20 万（与实际到账金额一致）',
+   '修复：同一天多个公告弹窗互相覆盖的问题，弹窗改为排队依次弹出，一个都不会漏',
+   '调整：日K图仅展示近 30 个交易日走势，更早的K线移出画布',
+   '重构：韭菜综合指数改为全场动态链式指数，新股上市 / 退市实时纳入，不再与市场生态脱节',
+   '新增：绝望难度全场涨跌幅翻倍 —— 主板 ±20% / 创业板 ±40%，波动与漂移同步加倍（driftMul 可配置），赚赔都更猛',
+   '新增：作弊面板（F9）大扩充 —— 持仓灌注 / 一键清仓 / 强制排期退市打新 / 免费小道消息 / 大盘情绪调节 / 权限全解锁 / 难度事件立即到期 / 解除来电 / 结局测试 / 快进 60 天',
+   '清理：移除 605098 遗留的无效 delist 字段；快进作弊结束后会补弹死亡结局弹窗']},
+ {v:'02260913tv', date:'2026-02-26', title:'主界面 + 四档难度版', items:[
+   '新增：启动主界面，可选「剧情模式」（暂未开发，敬请期待）与「无尽模式」',
+   '新增：无尽模式四档难度 —— 简单 120 万 / 中等 80 万 / 困难 50 万 / 绝望 20 万，目标均为 200 万',
+   '新增：简单档右下角 🧧 每 5 日可索要 20 万；中等档每 7 日可索要 10 万',
+   '新增：困难/绝望档右下角 🏠 每 30 日须缴 3 万房租水电费，逾期 3 日强制扣除并加收 5% 滞纳金',
+   '新增：绝望档第 60 日触发「爸爸喵在傲门新朴惊欠了 3000 万」，此后每 30 日来电索要 1 万，逾期 10 日不给则游戏失败',
+   '新增：绝望档通关后选择「继续玩下去」，来电骚扰永久解除',
+   '新增：顶栏 🏠 按钮可随时回主界面；作弊面板新增「快进 30 天」便于测试难度事件',
+   '优化：起始资金、通关目标、累计收益率均按本局难度计算；旧存档自动兼容为「经典」难度',
+   '优化：现金允许为负（欠租状态），可靠卖出持仓回补，不再一扣就死']}
+ ,{v:'02260911tv', date:'2026-02-26', title:'打新破产修复版', items:[
+   '修复：顶格打新后现金归零，被误判「账户归零」而强制清档的致命 Bug（冻结申购款现已计入总资产）',
+   '修复：申购资金被重复冻结，导致第二次申购必定失败、「顶格」按钮算出 0 股',
+   '修复：申购当天「今日盈亏」错误显示为 −100%、段位与解锁进度被误判',
+   '新增：左上角印章图标可点击，查看版权信息',
+   '新增：右上角 📜 按钮与页脚版本号，可查看版本更新日志',
+   '优化：账户面板与结算面板新增「冻结申购款」明细']},
+ {v:'02260901tv', date:'2026-02-20', title:'稳定性修复版', items:[
+   '修复：浏览器禁用本地存储时整页白屏、以及存档静默丢失',
+   '修复：解锁创业板 / 新股上市后左侧行情列表价格空白、选中高亮丢失',
+   '修复：新股发行价可能高于参考市价（溢价发行）；打新改为真·八折且上市首日有浮盈',
+   '修复：随机股可能与派息股撞代码，导致同一代码重复上市',
+   '修复：退市跌停期已挂的预买单被强制成交',
+   '新增：盘中弹窗自动暂停，关闭后自动恢复，不再错过一整天行情',
+   '优化：新闻时间标签区分盘前/盘中/盘后；跌停日分时图不再全白；指数改为固定成分股']}
+];
+
+/* ╔══════════════════════════════════════════════════════════════════════╗
+   ║  ★★★ 模式 / 难度配置 —— 自定义区（想调数值就改这里）★★★            ║
+   ║  cash=起始资金  goal=通关目标                                        ║
+   ║  perkA / perkB：右下角图标行为                                       ║
+   ║    type:'grant' 白给钱  amount=金额 cd=冷却天数 text=领取提示        ║
+   ║    type:'bill'  缴费用  amount=金额 cd=周期 grace=逾期宽限天         ║
+   ║                 lateRate=逾期加收比例 payText=缴费提示               ║
+   ║    type:'debt'  来电索款 amount=金额 cd=周期 grace=逾期即失败天      ║
+   ║                 revealDay=第几日揭晓 payText=给钱后的提示            ║
+   ╚══════════════════════════════════════════════════════════════════════╝ */
+const DIFFS={
+ legacy:{name:'经典',icon:'📼',cash:100000,goal:2000000,tag:'旧存档兼容',ipoDiscount:0.80,ipoBreak:0,
+   rules:['无任何场外事件，纯净炒股','起始 10 万 → 目标 200 万（+1900%）']},
+ tutor:{name:'教学',icon:'🎓',cash:100000,goal:2000000,tag:'教程专用',ipoDiscount:0.80,ipoBreak:0,
+   rules:['教程专用局，无任何场外事件']},
+ easy:{name:'简单',icon:'🌱',cash:1200000,goal:2000000,tag:'轻松上手',ipoDiscount:0.85,ipoBreak:0,
+   perkA:{type:'grant',amount:200000,cd:5,icon:'🧧',label:'啃老补助',
+     text:'从老登那里爆了20万资金，谢谢爸喵',
+     news:'🧧 又从老登那里爆了一笔资金，谢谢爸喵'},
+   rules:['起始资金 <b>120 万</b> → 目标 200 万，只需 <b>+67%</b>',
+          '每 <b>5</b> 个交易日可点右下角 🧧 索要 <b>20 万</b>（约等于白送）',
+          '创业板（50 万）与小道消息（80 万）<b>开局即解锁</b>',
+          '无任何缴费/催债压力，适合熟悉机制']},
+ normal:{name:'中等',icon:'🌿',cash:800000,goal:2000000,tag:'标准体验',ipoDiscount:0.80,ipoBreak:0,
+   perkA:{type:'grant',amount:100000,cd:7,icon:'🧧',label:'爸爸支持',
+     text:'儿子使劲干，爸爸喵支持你',
+     news:'🧧 爸爸喵又打来了 10 万：儿子使劲干，爸爸喵支持你'},
+   rules:['起始资金 <b>80 万</b> → 目标 200 万，需要 <b>+150%</b>',
+          '每 <b>7</b> 个交易日可点右下角 🧧 索要 <b>10 万</b>',
+          '创业板与小道消息<b>开局即解锁</b>',
+          '无缴费压力，节奏舒适']},
+ hard:{name:'困难',icon:'🌵',cash:500000,goal:2000000,tag:'硬核生存',ipoDiscount:0.75,ipoBreak:0.10,
+   perkA:{type:'bill',amount:30000,cd:30,grace:3,lateRate:0.05,icon:'🏠',label:'房租水电',
+     payText:'已缴纳本月房租水电费 ¥30,000，房东表示很满意',
+     news:'🏠 已缴纳房租水电费 ¥30,000'},
+   rules:['起始资金 <b>50 万</b> → 目标 200 万，需要 <b>+300%</b>',
+          '每 <b>30</b> 个交易日须点右下角 🏠 缴纳 <b>3 万</b>房租水电费',
+          '逾期 <b>3</b> 天将被<b class="up">强制扣除 3.15 万</b>（含 5% 滞纳金）',
+          '现金不足时会变成<b class="up">负数欠款</b>，需卖股回补',
+          '创业板开局解锁，小道消息需 80 万']},
+ despair:{name:'绝望',icon:'💀',cash:200000,goal:2000000,tag:'地狱模式',limitMul:2,driftMul:2,ipoDiscount:0.70,ipoBreak:0.20,
+   perkA:{type:'bill',amount:30000,cd:30,grace:3,lateRate:0.05,icon:'🏠',label:'房租水电',
+     payText:'已缴纳本月房租水电费 ¥30,000，房东表示很满意',
+     news:'🏠 已缴纳房租水电费 ¥30,000'},
+   perkB:{type:'debt',amount:10000,cd:30,grace:10,revealDay:60,icon:'📞',label:'爸爸来电',
+     payText:'谢谢儿子喵，爸爸喵这个月不用被电击了喵',
+     news:'📞 已给爸爸喵转账 ¥10,000，他这个月不用被电击了'},
+   rules:['起始资金仅 <b>20 万</b> → 目标 200 万，需要 <b>+900%</b>',
+          '全场涨跌幅<b class="up">翻倍</b>：主板 ±20% / 创业板 ±40%，波动与漂移同步加倍，赚赔都更猛',
+          '每 <b>30</b> 日缴 <b>3 万</b>房租，逾期 3 天强扣 + 5% 滞纳金',
+          '第 <b>60</b> 日：得知<b class="up">爸爸喵在傲门新朴惊欠了 3000 万</b>',
+          '此后每 <b>30</b> 天来电索要 <b>1 万</b>，给了会说「谢谢儿子喵」',
+          '<b class="up">逾期 10 天不给 → 游戏直接失败</b>',
+          '通关后若选择继续该存档，来电骚扰<b class="dn">永久解除</b>']}
+};
+const DIFF_ORDER=['easy','normal','hard','despair'];
+const diffName=k=>(DIFFS[k]&&DIFFS[k].name)||'经典';
+/* ★ 绝望难度涨跌幅倍率：主板 ±10%→±20%，创业板 ±20%→±40% */
+const diffLimitMul=()=>{const d=state&&DIFFS[state.diff];return (d&&d.limitMul)||1;};
+/* ★ 难度漂移倍率：tick 级实时读取，旧存档无需重开即生效 */
+const diffDriftMul=()=>{const d=state&&DIFFS[state.diff];return (d&&d.driftMul)||1;};
+/* ★ 市值波动率修正：大盘股波动降低，小盘股波动放大（立方根衰减） */
+const CAP_REF=1000;
+function capMul(s){const cap=(s.price||s.start)*(s.shares||20);if(cap<=0)return 1;
+ return clamp(Math.pow(CAP_REF/cap,1/3),0.75,1.40);}
+function fmtCap(s){const v=(s.price||0)*(s.shares||0);if(v>=10000)return (v/10000).toFixed(1)+'万亿';if(v>=1)return v.toFixed(0)+'亿';return (v*10000).toFixed(0)+'万';}
+
+/* ================= 配置 ================= */
+const CFG={ticksPerDay:36,candleTicks:4,baseInterval:3750,startCash:100000,maxCandles:280,chartCandles:270,
+  commission:0.00025,minCommission:5,stampTax:0.0005,
+  cybUnlock:500000,rumorCost:10000,rumorUnlock:800000,winNet:2000000,
+  delistSettle:0.3,poolSize:70,maxListed:45,minLifespan:6,preList:4,
+  eventChance:0.30,eventGap:3,ipoCap:10000000,
+  goldStart:900,goldSpread:13,goldVol:0.0040,goldRegimeK:0.0006,
+  alertStock:6,alertGold:2,
+  divChance:0.24,divGap:6,
+  scriptDelistDay:7};
+const SAVEKEY='jiucai_save_v4';
+const GOLD_CODE='GOLD';
+
+const THEMES=['消费','科技','金融','医药','新能源','传媒'];
+const STOCK_DEFS=[
+ {code:'600101',name:'新干妈甜酱',sector:'消费',start:42.50,drift:0.00010,vol:0.0020,shares:30,div:{per:1.20,every:25},isBase:true},
+ {code:'600777',name:'Good茗',    sector:'消费',start:26.80,drift:0.00016,vol:0.0055,shares:12,isBase:true},
+ {code:'600315',name:'金鲤香油',  sector:'消费',start:18.66,drift:0.00008,vol:0.0030,shares:22,isBase:true},
+ {code:'600888',name:'李子园',    sector:'消费',start:12.40,drift:0.00009,vol:0.0035,shares:28,isBase:true},
+ {code:'603377',name:'格调股份',  sector:'消费',start:14.60,drift:0.00010,vol:0.0038,shares:18,isBase:true},
+ {code:'600869',name:'醉仙酒业',  sector:'消费',start:1080.00,drift:0.00035,vol:0.0052,shares:3,isBase:true},
+ {code:'688001',name:'星辰半导体',sector:'科技',start:88.00,drift:0.00022,vol:0.0055,shares:15,isBase:true},
+ {code:'600588',name:'蓝科软件',  sector:'科技',start:31.20,drift:0.00015,vol:0.0045,shares:20,isBase:true},
+ {code:'603019',name:'天眼网安',  sector:'科技',start:45.70,drift:0.00014,vol:0.0040,shares:10,isBase:true},
+ {code:'601988',name:'缅储银行',  sector:'金融',start:6.66, drift:0.00005,vol:0.0012,shares:350,div:{per:0.08,every:20},isBase:true},
+ {code:'601288',name:'农农银行',  sector:'金融',start:3.58, drift:0.00004,vol:0.0010,shares:480,div:{per:0.15,every:15},isBase:true},
+ {code:'601928',name:'勾山银行',  sector:'金融',start:5.12, drift:0.00006,vol:0.0013,shares:280,div:{per:0.10,every:18},isBase:true},
+ {code:'600030',name:'太平证券',  sector:'金融',start:15.80,drift:0.00012,vol:0.0038,shares:45,isBase:true},
+ {code:'601628',name:'安盛保险',  sector:'金融',start:32.10,drift:0.00008,vol:0.0025,shares:35,isBase:true},
+ {code:'600276',name:'济世医药',  sector:'医药',start:47.40,drift:0.00012,vol:0.0032,shares:25,isBase:true},
+ {code:'600196',name:'康泰生物',  sector:'医药',start:68.90,drift:0.00013,vol:0.0042,shares:12,isBase:true},
+ {code:'603259',name:'仁心器械',  sector:'医药',start:54.30,drift:0.00011,vol:0.0036,shares:14,isBase:true},
+ {code:'600998',name:'超威灭蚊',  sector:'医药',start:22.30,drift:0.00012,vol:0.0040,shares:22,isBase:true},
+ {code:'600875',name:'绿源锂能',  sector:'新能源',start:34.20,drift:0.00017,vol:0.0048,shares:18,isBase:true},
+ {code:'601619',name:'风行风电',  sector:'新能源',start:9.88, drift:0.00010,vol:0.0032,shares:35,isBase:true},
+ {code:'600438',name:'朝阳光伏',  sector:'新能源',start:28.50,drift:0.00015,vol:0.0044,shares:16,isBase:true},
+ {code:'603444',name:'量子互娱',  sector:'传媒',start:55.30,drift:0.00020,vol:0.0065,shares:8,isBase:true},
+ {code:'600037',name:'星梦影业',  sector:'传媒',start:19.90,drift:0.00014,vol:0.0052,shares:15,isBase:true},
+ {code:'603598',name:'云顶传媒',  sector:'传媒',start:22.60,drift:0.00012,vol:0.0046,shares:12,isBase:true},
+ {code:'600637',name:'果漫广播',  sector:'传媒',start:8.96, drift:0.00007,vol:0.0030,shares:25,isBase:true},
+ {code:'605098',name:'华公教育',  sector:'传媒',start:9.20, drift:0.00013,vol:0.0058,shares:14,isBase:true},
+ {code:'300801',name:'智元机器人',sector:'科技',cyb:1,start:63.20,drift:0.00024,vol:0.0072,shares:6,isBase:true},
+ {code:'300832',name:'神速快递',  sector:'消费',cyb:1,start:17.45,drift:0.00014,vol:0.0062,shares:10,isBase:true},
+ {code:'300910',name:'创芯纳米',  sector:'科技',cyb:1,start:41.80,drift:0.00020,vol:0.0070,shares:5,isBase:true},
+ {code:'300888',name:'天工智芯',  sector:'科技',cyb:1,start:1250.00,drift:0.0004,vol:0.0065,shares:2,isBase:true},
+ {code:'300666',name:'江离生物',  sector:'医药',cyb:1,start:76.50,drift:0.00018,vol:0.0068,shares:7,isBase:true},
+ {code:'300999',name:'网联智行',  sector:'新能源',cyb:1,start:29.90,drift:0.00019,vol:0.0065,shares:12,isBase:true},
+ {code:'301023',name:'灵感传媒',  sector:'传媒',cyb:1,start:15.20,drift:0.00016,vol:0.0072,shares:9,isBase:true},
+ {code:'300777',name:'雷霆游戏',  sector:'传媒',cyb:1,start:48.60,drift:0.00021,vol:0.0075,shares:8,isBase:true},
+ {code:'301088',name:'爱宠宠物粮',sector:'消费',cyb:1,start:36.75,drift:0.00015,vol:0.0060,shares:10,isBase:true},
+ {code:'002666',name:'长鼻王',    sector:'消费',start:18.50,drift:0.00012,vol:0.0045,shares:16,isBase:true},
+ {code:'300896',name:'长信科技',  sector:'科技',cyb:1,start:42.80,drift:0.00018,vol:0.0058,shares:12,isBase:true},
+];
+const DIV_DEFS=[
+ {code:'601398',name:'通商钱庄',sector:'金融',  start:7.28, drift:0.00004,vol:0.0012,shares:800,div:{per:0.18,every:14}},
+ {code:'601328',name:'汇通银行',sector:'金融',  start:5.88, drift:0.00004,vol:0.0011,shares:900,div:{per:0.14,every:15}},
+ {code:'601668',name:'宏图建工',sector:'金融',  start:6.75, drift:0.00005,vol:0.0022,shares:220,div:{per:0.22,every:17}},
+ {code:'600377',name:'宁沪通衢',sector:'金融',  start:10.85,drift:0.00004,vol:0.0015,shares:180,div:{per:0.42,every:21}},
+ {code:'600028',name:'黑金石油',sector:'新能源',start:9.45, drift:0.00006,vol:0.0021,shares:300,div:{per:0.32,every:18}},
+ {code:'601088',name:'乌金煤炭',sector:'新能源',start:22.60,drift:0.00007,vol:0.0026,shares:150,div:{per:0.85,every:20}},
+ {code:'600900',name:'峡谷水电',sector:'新能源',start:26.30,drift:0.00005,vol:0.0017,shares:120,div:{per:0.72,every:22}},
+ {code:'600886',name:'安泰电力',sector:'新能源',start:14.30,drift:0.00006,vol:0.0020,shares:100,div:{per:0.48,every:19}},
+ {code:'600519',name:'醇香窖酒',sector:'消费',  start:158.00,drift:0.00012,vol:0.0028,shares:8,div:{per:4.20,every:25}},
+ {code:'600585',name:'磐石水泥',sector:'消费',  start:18.90,drift:0.00006,vol:0.0024,shares:60,div:{per:0.62,every:16}},
+];
+const RANKS=[[1e5,'新晋韭菜'],[1.5e5,'资深韭菜'],[2.5e5,'精明散户'],[4e5,'牛散苗子'],[6e5,'大户室常客'],[8e5,'消息灵通人士'],[1.2e6,'游资猎手'],[2e6,'民间股神']];
+
+/* ================= 工具 ================= */
+const $=id=>document.getElementById(id);
+const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
+function gauss(){let u=0,v=0;while(!u)u=Math.random();while(!v)v=Math.random();return Math.sqrt(-2*Math.log(u))*Math.cos(2*Math.PI*v);}
+const pick=a=>a[Math.floor(Math.random()*a.length)];
+const fmt2=n=>n.toLocaleString('zh-CN',{minimumFractionDigits:2,maximumFractionDigits:2});
+const money=n=>(n<0?'-¥':'¥')+fmt2(Math.abs(n));      /* ★ 支持负现金显示 */
+const sgnPct=v=>(v>=0?'+':'')+v.toFixed(2)+'%';
+const cls=v=>v>=0?'up':'dn';
+const r2=n=>Math.round(n*100)/100;
+const LS={_warned:false,
+ get(k){try{return localStorage.getItem(k);}catch(e){return null;}},
+ set(k,v){try{localStorage.setItem(k,v);return true;}
+   catch(e){if(!LS._warned){LS._warned=true;
+     toast('⚠️ 浏览器禁用了本地存储：进度无法自动保存，请用顶栏「⬇」手动导出存档','err');}
+    return false;}},
+ del(k){try{localStorage.removeItem(k);}catch(e){}}};
+function clockLabel(t){const m=570+Math.round(t*(330/CFG.ticksPerDay));return String(Math.floor(m/60)).padStart(2,'0')+':'+String(m%60).padStart(2,'0');}
+function fitCanvas(cv){const d=devicePixelRatio||1,W=cv.clientWidth,H=cv.clientHeight;
+ if(cv.width!==Math.round(W*d)||cv.height!==Math.round(H*d)){cv.width=Math.round(W*d);cv.height=Math.round(H*d);}
+ const ctx=cv.getContext('2d');ctx.setTransform(d,0,0,d,0,0);ctx.clearRect(0,0,W,H);return{ctx,W,H};}
+function makeDraggable(panel,handle){
+ const anchor=e=>{
+   if(e.target.closest('button,input,select,.cl'))return false;
+   const r=panel.getBoundingClientRect();
+   panel.style.left=r.left+'px';panel.style.top=r.top+'px';
+   panel.style.right='auto';panel.style.bottom='auto';panel.style.transform='none';
+   panel.dataset.ox=e.clientX-r.left;panel.dataset.oy=e.clientY-r.top;return true;};
+ const move=ev=>{const w=panel.offsetWidth,h=panel.offsetHeight;
+   panel.style.left=clamp(ev.clientX-+panel.dataset.ox,2,Math.max(2,innerWidth-w-2))+'px';
+   panel.style.top=clamp(ev.clientY-+panel.dataset.oy,2,Math.max(2,innerHeight-Math.min(h,60)-2))+'px';};
+ if(window.PointerEvent){
+  handle.addEventListener('pointerdown',e=>{
+   if(!anchor(e))return;
+   try{handle.setPointerCapture(e.pointerId);}catch(err){}
+   const mv=ev=>move(ev);
+   const up=()=>{handle.removeEventListener('pointermove',mv);handle.removeEventListener('pointerup',up);
+     handle.removeEventListener('pointercancel',up);};
+   handle.addEventListener('pointermove',mv);handle.addEventListener('pointerup',up);
+   handle.addEventListener('pointercancel',up);
+   e.preventDefault();});
+ }else{
+  handle.addEventListener('mousedown',e=>{
+   if(!anchor(e))return;
+   const mv=ev=>{move(ev);ev.preventDefault();};
+   const up=()=>{document.removeEventListener('mousemove',mv);document.removeEventListener('mouseup',up);};
+   document.addEventListener('mousemove',mv);document.addEventListener('mouseup',up);
+   e.preventDefault();});}}
+
+/* ================= 主题 ================= */
+const PALETTES={
+ dark:{hollow:'#101a27',grid:'rgba(90,120,160,.13)',axis:'#5b7290',up:'#ff5252',dn:'#2bd48a',cross:'rgba(255,255,255,.25)',tipbg:'rgba(10,16,23,.92)',tipbd:'rgba(255,255,255,.15)',line:'#e8f1ff',base:'rgba(245,185,66,.55)',ma5:'rgba(245,185,66,.9)',ma10:'rgba(90,209,255,.85)',txt:'#d9e4f2',fillUp:'rgba(255,82,82,.12)',fillDn:'rgba(43,212,138,.12)'},
+ light:{hollow:'#ffffff',grid:'rgba(70,90,120,.15)',axis:'#7a8ba0',up:'#e02e2e',dn:'#0a9e5c',cross:'rgba(0,0,0,.22)',tipbg:'rgba(255,255,255,.96)',tipbd:'rgba(0,0,0,.12)',line:'#26303c',base:'rgba(200,140,20,.6)',ma5:'rgba(200,140,20,.9)',ma10:'rgba(20,110,200,.85)',txt:'#182430',fillUp:'rgba(224,46,46,.10)',fillDn:'rgba(10,158,92,.10)'}
+};
+let PAL=PALETTES.dark;
+function applyTheme(t){document.documentElement.dataset.theme=t;PAL=PALETTES[t]||PALETTES.dark;
+ $('btnTheme').textContent=t==='light'?'🌙':'☀️';if(state)drawChart();}
+function toggleTheme(){applyTheme(document.documentElement.dataset.theme==='light'?'dark':'light');autoSave();}
+
+/* ================= 状态 ================= */
+let state=null,stocks=[],pool=[],timer=null,prevPx={},HV={k:null,f:null},ipoQtyVal=100;
+let gold=null,chipsMode=null,veilBusy=false,modalResume=false,lastDiff='normal';
+
+function newGold(){return{code:GOLD_CODE,name:'传世之宝9999千足金',sector:'贵金属',isGold:true,
+ start:CFG.goldStart,drift:0,vol:CFG.goldVol,price:CFG.goldStart,prevClose:CFG.goldStart,
+ open:CFG.goldStart,high:CFG.goldStart,low:CFG.goldStart,bias:0,biasTicks:0,
+ todaySeries:[CFG.goldStart],candles:[],limitState:0,alertDay:0};}
+/* ★ presimGold 已合并至 presimAsset(gold)，见下方 presimAsset */
+const goldSellPrice=()=>Math.max(1,+(gold.price-CFG.goldSpread).toFixed(2));
+const goldValue=()=>(state&&state.gold&&state.gold.qty>0)?state.gold.qty*goldSellPrice():0;
+const goldAfford=()=>Math.max(0,Math.floor(state.cash/gold.price*100)/100);
+const ipoFrozen=()=>(state&&Array.isArray(state.ipos))?state.ipos.reduce((t,o)=>t+(+o.qty||0)*(+o.price||0),0):0;
+function goldShock(pct){gold.price=+Math.max(50,gold.price*(1+pct)).toFixed(2);
+ gold.high=Math.max(gold.high,gold.price);gold.low=Math.min(gold.low,gold.price);
+ const c=gold.candles[gold.candles.length-1];if(c){c.c=gold.price;c.h=Math.max(c.h,gold.price);c.l=Math.min(c.l,gold.price);}
+ if(gold.todaySeries.length)gold.todaySeries[gold.todaySeries.length-1]=gold.price;}
+function goldTick(){
+ const isNew=(state.tick-1)%CFG.candleTicks===0;
+ let r=gold.drift-(state.regime-1)*CFG.goldRegimeK+gauss()*gold.vol;
+ if(gold.biasTicks>0){r+=gold.bias;gold.biasTicks--;if(!gold.biasTicks)gold.bias=0;}
+ const p=+Math.max(50,gold.price*(1+r)).toFixed(2);
+ if(isNew){gold.candles.push({o:gold.price,h:Math.max(gold.price,p),l:Math.min(gold.price,p),c:p});
+   if(gold.candles.length>CFG.maxCandles)gold.candles.shift();}
+ else{const c=gold.candles[gold.candles.length-1];if(c){c.c=p;c.h=Math.max(c.h,p);c.l=Math.min(c.l,p);}}
+ gold.price=p;gold.high=Math.max(gold.high,p);gold.low=Math.min(gold.low,p);
+ gold.todaySeries.push(p);if(gold.todaySeries.length>CFG.ticksPerDay+2)gold.todaySeries.shift();
+ if(state.gold&&state.gold.qty>0){const gp=(p/gold.prevClose-1)*100;
+   if(Math.abs(gp)>=CFG.alertGold&&gold.alertDay!==state.day){gold.alertDay=state.day;
+     toast('🪙 黄金提醒：金价今日已'+(gp>0?'上涨':'下跌')+' '+Math.abs(gp).toFixed(1)+'%',gp>0?'ok':'err');}}}
+
+/* ★ 难度事件（右下角图标）状态机 */
+function newPerkState(type,cfg){
+ const st={type:type,nextDay:0,dueDay:0,revealed:false,retired:false,paidCount:0,forcedCount:0};
+ if(type==='grant')st.nextDay=1;              /* 第 1 日即可领 */
+ if(type==='bill')st.nextDay=cfg.cd;          /* 首个账单第 cd 日到期 */
+ return st;}
+function buildPerks(diff){const d=DIFFS[diff]||{};const P={};
+ if(d.perkA)P.A=newPerkState(d.perkA.type,d.perkA);
+ if(d.perkB)P.B=newPerkState(d.perkB.type,d.perkB);
+ return P;}
+function perkCfg(k){const d=DIFFS[state.diff];if(!d)return null;return k==='A'?d.perkA:d.perkB;}
+
+function newState(diff){
+ diff=(diff&&DIFFS[diff])?diff:'legacy';
+ const d=DIFFS[diff],cash=d.cash;
+ return{day:1,tick:0,cash:cash,startCash:cash,goal:d.goal,mode:'endless',diff:diff,
+ holdings:{},gold:null,selected:'688001',
+ speed:1,paused:false,phase:'pre',chartMode:'k',chartZoom:CFG.chartCandles,chartOffset:0,news:[],trades:[],preOrders:[],rumors:[],
+ events:[],ipos:[],lastAnnounce:0,lastDivList:0,bestTrade:null,worstTrade:null,lastBoard:null,
+ regime:1,indexOpen:1000,indexLevel:1000,startOfDayNet:cash,maxNet:cash,
+ tutorial:false,tutStep:0,perks:buildPerks(diff),
+ flags:{cyb:false,rumor:false}};}
+function makeStocks(){const lm=diffLimitMul();return STOCK_DEFS.map(d=>({...d,anchor:d.start,limit:(d.cyb?0.20:0.10)*lm,price:d.start,prevClose:d.start,
+ open:d.start,high:d.start,low:d.start,bias:0,biasTicks:0,todaySeries:[d.start],candles:[],
+ limitState:0,limitNews:false,delisted:false,listed:true,listDay:0,alertDay:0,openReady:0,
+ divTimer:d.div?d.div.every:0}));}
+const P1=['华','中','天','海','金','瑞','泰','盛','宏','远','新','光','智','云','星','宇','博','达','凯','恒','信','德','福','隆','昌','兴','源','丰','润','泽','嘉','安','康','宁','乐','百','万','众','合','正'];
+const P2=['科','芯','药','能','材','机','车','食','饮','服','建','化','钢','电','环','通','传','软','网','光','激','航','物','流','零','餐','旅','教','医','农','牧','矿','融','资','数','联'];
+const P3=['股份','集团','科技','实业','控股','发展','工业','电子','制药','能源','材料','重工','食品','乳业','服饰','置业','建工','化学','特钢','电力','燃气','水务','环境','通信','文化','软件','网络','光电','激光','智能','航空','物流','商业','餐饮','旅游','传媒','生物','农业','矿业','金融'];
+/* ★ Asset 工厂函数：统一股票对象的字段初始化，消除 makePool 中的重复字段列表 */
+function createStock(ov){return Object.assign({code:'',name:'',sector:'',start:10,drift:0.0001,vol:0.002,shares:20,
+ cyb:0,isBase:false,isDiv:false,listed:false,delisted:false,limit:0.10,price:0,prevClose:0,open:0,high:0,low:0,
+ bias:0,biasTicks:0,todaySeries:[],candles:[],limitState:0,limitNews:false,alertDay:0,
+ divTimer:0,listDay:0,openReady:0,anchor:0,shockTicks:0,shockMul:1},ov);}
+function makePool(){const arr=[];const uc=new Set(STOCK_DEFS.map(d=>d.code));const un=new Set(STOCK_DEFS.map(d=>d.name));
+ DIV_DEFS.forEach(d=>{uc.add(d.code);un.add(d.name);});
+ let guard=0;while(arr.length<CFG.poolSize&&guard<8000){guard++;
+  const name=pick(P1)+pick(P2)+pick(P3);if(un.has(name))continue;
+  const prefix=pick(['600','601','603','000','001','002']);let code=null;
+  for(let t=0;t<20;t++){const c=prefix+String(100+Math.floor(Math.random()*900));if(!uc.has(c)){code=c;break;}}
+  if(!code)continue;uc.add(code);un.add(name);
+  const st=+(5+Math.random()*75).toFixed(2);
+  arr.push(createStock({code,name,sector:pick(THEMES),start:st,anchor:st,
+   drift:+(0.00005+Math.random()*0.00025).toFixed(6),vol:+(0.0015+Math.random()*0.0035).toFixed(5),
+   shares:Math.max(3,Math.min(80,Math.round(300/st+Math.random()*20))),
+   price:st,prevClose:st,open:st,high:st,low:st,todaySeries:[st]}));}
+ DIV_DEFS.forEach(d=>{uc.add(d.code);un.add(d.name);
+  arr.push(createStock({code:d.code,name:d.name,sector:d.sector,start:d.start,anchor:d.start,drift:d.drift,vol:d.vol,
+   isDiv:true,div:d.div,divTimer:d.div.every}));});
+ return arr;}
+/* ★ 统一预模拟函数：适用于股票和黄金（Asset 接口共享 candles/price/vol/drift/start 等字段） */
+function presimAsset(a){let p=a.start;const isG=!!a.isGold;
+ for(let d=0;d<80;d++)for(let c=0;c<9;c++){
+   const o=p;
+   const r=isG?(a.start-p)/a.start*0.02+gauss()*a.vol*1.1:a.drift*1.4+gauss()*a.vol*1.15;
+   let cl=isG?Math.max(50,o*(1+r)):Math.max(0.5,o*(1+r));
+   const h=Math.max(o,cl)*(1+Math.abs(gauss())*a.vol*0.45),l=Math.min(o,cl)*(1-Math.abs(gauss())*a.vol*0.45);
+   a.candles.push({o,h,l,c:cl});p=cl;}
+ a.candles=a.candles.slice(-CFG.maxCandles);a.price=+p.toFixed(2);a.prevClose=a.price;a.open=a.price;
+ a.high=a.price;a.low=a.price;a.todaySeries=[a.price];}
+const getStock=c=>stocks.find(s=>s.code===c);
+const getTarget=c=>c===GOLD_CODE?gold:getStock(c);
+/* ★ 全场动态链式指数：indexLevel（昨收基准）× 当日全场等权平均 price/prevClose
+   新股上市自动纳入、退市自动剔除，链式衔接不跳变 */
+function marketRatio(){let t=0,n=0;
+ stocks.forEach(s=>{if(s.delisted||!s.listed||!(s.prevClose>0))return;t+=s.price/s.prevClose;n++;});
+ return n?t/n:1;}
+function calcIndex(){return ((state&&state.indexLevel>0)?state.indexLevel:1000)*marketRatio();}
+function netWorth(){let n=state.cash;
+ for(const c in state.holdings){const st=getStock(c);if(st)n+=state.holdings[c].qty*st.price;}
+ n+=goldValue();n+=ipoFrozen();return n;}
+const liveCount=()=>stocks.filter(s=>!s.delisted).length;
+const pendingListCount=()=>state?state.events.filter(e=>e.type==='list').length:0;
+function canAddStock(){return liveCount()+pendingListCount()<CFG.maxListed;}
+const buyFee=a=>Math.max(CFG.minCommission,a*CFG.commission);
+const sellFee=a=>Math.max(CFG.minCommission,a*CFG.commission)+a*CFG.stampTax;
+const affordQty=p=>Math.max(0,Math.floor(state.cash/(p*(1+CFG.commission))/100)*100);   /* ★ 负现金时钳到 0 */
+function inPanic(s){return state.events.some(e=>e.type==='delist'&&e.code===s.code&&state.day>=e.announceDay&&state.day<e.execDay);}
+function lockedBuyCash(){return state.preOrders.reduce((t,o)=>{
+  if(o.code===GOLD_CODE)return t+o.qty*gold.price;
+  const st=getStock(o.code);return st?t+o.qty*st.price*1.001:t;},0);}
+function lockedSellQty(code){return state.preOrders.filter(o=>o.code===code&&o.side==='sell').reduce((t,o)=>t+o.qty,0);}
+function heldQty(){
+ if(state.selected===GOLD_CODE)return state.gold?state.gold.qty:0;
+ const h=state.holdings[state.selected];return h?h.qty:0;}
+function sellableQty(){
+ if(state.selected===GOLD_CODE)return Math.max(0,r2(heldQty()-lockedSellQty(GOLD_CODE)));
+ return Math.max(0,heldQty()-lockedSellQty(state.selected));}
+
+/* ================= 存档 ================= */
+function saveObj(){return{v:4,S:state,stocks,pool,gold:gold,theme:document.documentElement.dataset.theme};}
+function autoSave(){LS.set(SAVEKEY,JSON.stringify(saveObj()));}
+function exportSave(){
+ const blob=new Blob([JSON.stringify(saveObj())],{type:'text/plain'});
+ const url=URL.createObjectURL(blob);const a=document.createElement('a');
+ a.href=url;a.download='韭菜翻身记_存档_第'+state.day+'天.txt';
+ document.body.appendChild(a);a.click();
+ setTimeout(()=>{try{URL.revokeObjectURL(url);}catch(e){}if(a.parentNode)a.parentNode.removeChild(a);},0);
+ toast('存档已导出（第 '+state.day+' 天）','ok');}
+function normalizeLoaded(d){
+ if(!d||typeof d!=='object'||!d.S||!Array.isArray(d.stocks))throw new Error('存档结构不完整');
+ if(d.v!==4)toast('⚠️ 存档版本为 v'+(d.v===undefined?'?':d.v)+'（当前 v4），已按兼容模式读取','err');
+ state=d.S;stocks=d.stocks;pool=Array.isArray(d.pool)?d.pool:[];gold=d.gold||newGold();
+ const num=(v,dflt)=>(typeof v==='number'&&isFinite(v))?v:dflt;
+ state.day=Math.max(1,Math.floor(num(state.day,1)));
+ state.tick=Math.max(0,Math.floor(num(state.tick,0)));
+ state.cash=num(state.cash,CFG.startCash);
+ state.speed=[1,2,4,16].indexOf(+state.speed)>=0?+state.speed:1;
+ state.phase=(state.phase==='open'||state.phase==='closed')?state.phase:'pre';
+ state.paused=!!state.paused;
+ state.chartMode=(state.chartMode==='line')?'line':'k';
+ state.chartZoom=Math.max(30,Math.min(CFG.maxCandles,num(state.chartZoom,CFG.chartCandles)));
+ state.chartOffset=num(state.chartOffset,0);
+ state.holdings=(state.holdings&&typeof state.holdings==='object')?state.holdings:{};
+ state.flags=(state.flags&&typeof state.flags==='object')?state.flags:{};
+ ['events','ipos','news','trades','preOrders','rumors'].forEach(k=>{if(!Array.isArray(state[k]))state[k]=[];});
+ state.ipos=state.ipos.filter(o=>o&&typeof o.code==='string'&&(+o.qty)>0&&(+o.price)>0);
+ state.gold=(state.gold&&state.gold.qty>0)?state.gold:null;
+ state.lastAnnounce=num(state.lastAnnounce,0);state.lastDivList=num(state.lastDivList,0);state.lastBoard=state.lastBoard||null;
+ state.bestTrade=(state.bestTrade===undefined)?null:state.bestTrade;
+ state.worstTrade=(state.worstTrade===undefined)?null:state.worstTrade;
+ state.maxNet=num(state.maxNet,CFG.startCash);state.startOfDayNet=num(state.startOfDayNet,CFG.startCash);
+ state.regime=num(state.regime,1);state.tutorial=!!state.tutorial;state.tutStep=num(state.tutStep,0);
+ state.selected=(typeof state.selected==='string')?state.selected:'688001';
+ /* ★ 难度字段兼容：旧存档 → legacy（经典），不附加任何场外事件 */
+ state.diff=(typeof state.diff==='string'&&DIFFS[state.diff])?state.diff:'legacy';
+ state.mode=(typeof state.mode==='string')?state.mode:'endless';
+ state.startCash=(num(state.startCash,0)>0)?state.startCash:CFG.startCash;
+ state.goal=(num(state.goal,0)>0)?state.goal:CFG.winNet;
+ ensurePerks();
+ delete state.idxHist;delete state.scriptWarned;
+ const seen=new Set();
+ stocks=stocks.filter(s=>{if(!s||typeof s.code!=='string'||seen.has(s.code))return false;
+                          seen.add(s.code);return true;});
+ stocks.forEach(s=>{
+   const def=STOCK_DEFS.find(d=>d.code===s.code)||DIV_DEFS.find(d=>d.code===s.code);
+   if(def)s.name=def.name;
+   delete s.allCloses;
+   if(s.alertDay===undefined)s.alertDay=0;
+   if(s.isDiv===undefined)s.isDiv=!!s.div;
+   if(typeof s.isBase!=='boolean')s.isBase=false;
+   if(typeof s.delisted!=='boolean')s.delisted=false;
+   if(typeof s.listed!=='boolean')s.listed=!s.delisted;
+   s.price=num(s.price,0);s.prevClose=num(s.prevClose,0);
+   if(!(s.price>0))s.price=s.prevClose||num(s.open,0)||num(s.start,10)||10;
+   if(!(s.prevClose>0))s.prevClose=s.price;
+   s.open=num(s.open,s.prevClose);s.high=num(s.high,s.price);s.low=num(s.low,s.price);
+   s.start=num(s.start,s.price);s.vol=num(s.vol,0.003);s.drift=num(s.drift,0.0001);
+   s.anchor=num(s.anchor,s.start);
+   s.shockTicks=num(s.shockTicks,0);s.shockMul=num(s.shockMul,1);
+   s.shares=num(s.shares,20);
+   s.candles=Array.isArray(s.candles)?s.candles:[];
+   s.todaySeries=(Array.isArray(s.todaySeries)&&s.todaySeries.length)?s.todaySeries:[s.price];
+   s.limitState=num(s.limitState,0);s.limitNews=!!s.limitNews;
+   s.bias=num(s.bias,0);s.biasTicks=num(s.biasTicks,0);
+   s.listDay=num(s.listDay,0);s.openReady=0;
+   s.limit=num(s.limit,(s.cyb?0.20:0.10)*diffLimitMul());
+   if(state.diff==='despair')s.limit=(s.cyb?0.20:0.10)*2;   /* 旧绝望存档按翻倍补正 */
+   if(THEMES.indexOf(s.sector)<0)s.sector=THEMES[0];
+   s.divTimer=s.div?Math.max(1,Math.floor(num(s.divTimer,s.div.every))):0;});
+ pool=pool.filter(p=>p&&typeof p.code==='string');
+ pool.forEach(p=>{delete p.allCloses;
+   if(p.isDiv===undefined)p.isDiv=!!p.div;
+   if(typeof p.listed!=='boolean')p.listed=false;
+   if(typeof p.delisted!=='boolean')p.delisted=false;p.openReady=0;});
+ if(!pool.some(p=>p.isDiv))DIV_DEFS.forEach(dd=>{if(!pool.some(p=>p.code===dd.code))
+   pool.push({code:dd.code,name:dd.name,sector:dd.sector,start:dd.start,drift:dd.drift,vol:dd.vol,
+    cyb:0,isBase:false,isDiv:true,listed:false,delisted:false,limit:0.10,price:0,prevClose:0,open:0,high:0,low:0,
+    bias:0,biasTicks:0,todaySeries:[],candles:[],limitState:0,limitNews:false,alertDay:0,
+    div:dd.div,divTimer:dd.div.every,listDay:0,openReady:0});});
+ delete gold.allCloses;
+ if(gold.alertDay===undefined)gold.alertDay=0;
+ gold.vol=num(gold.vol,CFG.goldVol);gold.drift=num(gold.drift,0);
+ gold.price=num(gold.price,0);gold.prevClose=num(gold.prevClose,0);
+ if(!(gold.price>0))gold.price=CFG.goldStart;
+ if(!(gold.prevClose>0))gold.prevClose=gold.price;
+ gold.open=num(gold.open,gold.prevClose);gold.high=num(gold.high,gold.price);gold.low=num(gold.low,gold.price);
+ gold.bias=num(gold.bias,0);gold.biasTicks=num(gold.biasTicks,0);
+ gold.todaySeries=(Array.isArray(gold.todaySeries)&&gold.todaySeries.length)?gold.todaySeries:[gold.price];
+ if(!Array.isArray(gold.candles)||!gold.candles.length)presimAsset(gold);
+ if(!stocks.length)throw new Error('存档中没有可交易标的');
+ state.indexLevel=(num(state.indexLevel,0)>0)?state.indexLevel:((num(state.indexOpen,0)>0)?state.indexOpen:1000);
+ state.indexOpen=(num(state.indexOpen,0)>0)?state.indexOpen:(state.indexLevel||1000);}
+/* ★ 难度事件状态兜底：缺字段就按当前难度重建，绝不让状态机卡死 */
+function ensurePerks(){
+ const d=DIFFS[state.diff]||{};
+ state.perks=(state.perks&&typeof state.perks==='object')?state.perks:{};
+ [['A',d.perkA],['B',d.perkB]].forEach(pr=>{
+   const k=pr[0],cfg=pr[1];
+   if(!cfg){delete state.perks[k];return;}
+   let st=state.perks[k];
+   if(!st||st.type!==cfg.type)st=state.perks[k]=newPerkState(cfg.type,cfg);
+   st.revealed=!!st.revealed;st.retired=!!st.retired;
+   st.paidCount=Math.max(0,Math.floor(+st.paidCount||0));
+   st.forcedCount=Math.max(0,Math.floor(+st.forcedCount||0));
+   st.dueDay=Math.max(0,Math.floor(+st.dueDay||0));
+   st.nextDay=Math.max(0,Math.floor(+st.nextDay||0));
+   if(!st.dueDay&&!st.nextDay&&!(cfg.type==='debt'&&!st.revealed))
+     st.nextDay=(cfg.type==='grant')?state.day:state.day+cfg.cd;
+   if(cfg.type==='debt'&&st.revealed&&!st.dueDay&&!st.nextDay)st.nextDay=state.day+cfg.cd;});}
+function importSave(input){const f=input.files[0];if(!f)return;
+ const rd=new FileReader();
+ rd.onload=e=>{
+  let d=null;
+  try{d=JSON.parse(e.target.result);}catch(err){return toast('存档文件不是合法 JSON','err');}
+  if(!d||!d.S||!Array.isArray(d.stocks))return toast('存档文件无效（缺少必要字段）','err');
+  clearTimeout(timer);
+  try{
+   normalizeLoaded(d);
+   applyTheme(d.theme||'dark');
+   buildWatchlist();renderPreList();chipsMode=null;ipoQtyVal=100;
+   if(DIFFS[state.diff]&&DIFF_ORDER.indexOf(state.diff)>=0)lastDiff=state.diff;
+   if(state.selected!==GOLD_CODE&&!getStock(state.selected)){const nx=stocks.find(x=>!(x.cyb&&!state.flags.cyb));if(nx)state.selected=nx.code;}
+   selectStock(state.selected);renderActionBtns();syncCheat();invalidateAll();
+   if(state.phase==='open'&&!state.paused)schedule();
+   autoSave();toast('存档导入成功（第 '+state.day+' 天 · '+diffName(state.diff)+'）','ok');hideModal();
+   if(state.flags.dadDead)showDadDead();else if(state.flags.dead)showDead();
+  }catch(err){
+   toast('存档读取失败：'+((err&&err.message)||err)+'，已为你新开一局','err');
+   newGame(lastDiff);showMainMenu();}};
+ rd.onerror=()=>toast('文件读取失败','err');
+ rd.readAsText(f);input.value='';}
+
+/* ================= 渲染管线 ================= */
+const dirty={header:1,watchlist:1,detail:1,trade:1,assets:1,holdings:1,trades:1,news:1,rumor:1,events:1,action:1,perks:1};
+let rafPending=false;
+function mark(){for(let i=0;i<arguments.length;i++)dirty[arguments[i]]=1;scheduleRender();}
+function invalidateAll(){for(const k in dirty)dirty[k]=1;scheduleRender();}
+function updateAll(){invalidateAll();}
+function scheduleRender(){if(!rafPending){rafPending=true;requestAnimationFrame(doRender);}}
+function doRender(){rafPending=false;
+ if(dirty.header){updateHeader();dirty.header=0;}
+ if(dirty.watchlist){updateWatchlist();dirty.watchlist=0;}
+ if(dirty.detail){updateDetail();dirty.detail=0;}
+ if(dirty.trade){updateTradePanel();dirty.trade=0;}
+ if(dirty.assets){updateAssets();dirty.assets=0;}
+ if(dirty.holdings){renderHoldings();dirty.holdings=0;}
+ if(dirty.trades){renderTrades();dirty.trades=0;}
+ if(dirty.news){renderNews();dirty.news=0;}
+ if(dirty.rumor){renderRumors();dirty.rumor=0;}
+ if(dirty.events){renderEventZone();dirty.events=0;}
+ if(dirty.action){phaseBtn();dirty.action=0;}
+ if(dirty.perks){renderPerkDock();dirty.perks=0;}}
+
+/* ================= ★ 难度事件：推进 / 交互 / 渲染 ================= */
+function updatePerks(){
+ if(!state||!state.perks||state.tutorial||state.mode!=='endless')return;
+ const d=DIFFS[state.diff];if(!d)return;
+ ['A','B'].forEach(k=>{
+   const st=state.perks[k];if(!st||st.retired)return;
+   const cfg=k==='A'?d.perkA:d.perkB;if(!cfg||cfg.type!==st.type)return;
+   if(st.type==='grant')return;                       /* 白给型：无需按日推进 */
+   if(st.type==='bill'){
+     if(!st.dueDay&&st.nextDay&&state.day>=st.nextDay){
+       st.dueDay=state.day;
+       pushNews('账单','bad','🏠 房租水电费到期：请在 '+cfg.grace+' 天内点右下角 🏠 缴纳 '+money(cfg.amount));
+       toast('🏠 房租水电费到期，需缴 '+money(cfg.amount)+'（逾期 '+cfg.grace+' 天将强扣 +'+Math.round(cfg.lateRate*100)+'%）','err');}
+     if(st.dueDay&&state.day>=st.dueDay+cfg.grace)forceBill(cfg,st);
+     return;}
+   if(st.type==='debt'){
+     if(!st.revealed&&state.day>=cfg.revealDay){
+       st.revealed=true;st.dueDay=state.day;revealDebt(cfg);return;}
+     if(st.revealed&&!st.dueDay&&st.nextDay&&state.day>=st.nextDay){
+       st.dueDay=state.day;
+       pushNews('家用','bad','📞 爸爸喵来电：这个月的 '+money(cfg.amount)+' 该给了喵');
+       toast('📞 爸爸喵来电要 '+money(cfg.amount)+'！逾期 '+cfg.grace+' 天后果不堪设想','err');}
+     if(st.dueDay&&state.day>=st.dueDay+cfg.grace){dadDead(cfg);return;}
+   }});
+ mark('perks');}
+function forceBill(cfg,st){
+ const amt=Math.round(cfg.amount*(1+(cfg.lateRate||0)));
+ state.cash-=amt;                                          /* 现金可为负，靠卖股回补 */
+ st.dueDay=0;st.nextDay=state.day+cfg.cd;st.forcedCount++;
+ pushNews('账单','bad','🏠 房租逾期未缴，被房东强制扣除 '+money(amt)+'（含 '+Math.round((cfg.lateRate||0)*100)+'% 滞纳金）');
+ toast('⚠️ 房租逾期！强制扣除 '+money(amt)+(state.cash<0?'，现金已透支 '+money(-state.cash):''),'err');
+ invalidateAll();autoSave();
+ if(!state.flags.dead)checkEnd(netWorth());}
+function revealDebt(cfg){
+ pushNews('家用','bad','📞 噩耗：爸爸喵在傲门新朴惊欠了 3000 万，从此每 '+cfg.cd+' 天来电索要 '+money(cfg.amount));
+ toast('📞 噩耗！爸爸喵在傲门新朴惊欠了 3000 万','err');
+ showModal('<h2>📞 一通来自傲门的电话</h2><div class="msub">第 '+state.day+' 日 · 坏消息来了喵</div>'+
+  '<p style="margin:14px 0;font-size:13px;line-height:2;color:var(--dim)">你得知：<b class="up">爸爸喵在傲门新朴惊欠了 3000 万</b>。</p>'+
+  '<div class="receipt">'+
+   '<div class="rl"><span>索要金额</span><b>'+money(cfg.amount)+' / 次</b></div>'+
+   '<div class="rl"><span>来电频率</span><b>每 '+cfg.cd+' 个交易日</b></div>'+
+   '<div class="rl"><span>宽限期</span><b>'+cfg.grace+' 天</b></div>'+
+   '<div class="rl"><span>逾期后果</span><b class="up">游戏直接失败</b></div></div>'+
+  '<p style="font-size:12.5px;line-height:1.95;color:var(--dim)">按时给钱，他会说：<b class="dn">「谢谢儿子喵，爸爸喵这个月不用被电击了喵」</b></p>'+
+  '<p style="font-size:12px;line-height:1.9;color:var(--up)">逾期 '+cfg.grace+' 天不给……后果你自己想喵。</p>'+
+  '<p style="font-size:11px;color:var(--faint);line-height:1.8">💡 右下角新增 📞 图标；攒到 '+money(state.goal)+' 通关后选择「继续玩下去」即可永久解除该限制。</p>'+
+  '<div class="mbtns"><button class="mbtn pri" onclick="hideModal()">我知道了喵</button></div>');
+ mark('perks','header','assets');}
+function dadDead(cfg){
+ state.flags.dadDead=1;state.flags.dead=1;state.paused=true;clearTimeout(timer);
+ $('btnPause').textContent='▶';showDadDead();autoSave();}
+function showDadDead(){
+ const st=(state.perks&&state.perks.B)||{};
+ showModal('<h2>💀 结局 · 园区来信</h2><div class="msub">第 '+state.day+' 日 · 你没能接住这通电话</div>'+
+  '<p style="margin:16px 0;font-size:13.5px;line-height:2.1;color:var(--up)">爸爸喵被电死了喵，你继承了爸爸喵的债务，你被抓到园区吊起来了喵......</p>'+
+  '<div class="receipt">'+
+   '<div class="rl"><span>难度</span><b>'+diffName(state.diff)+'</b></div>'+
+   '<div class="rl"><span>坚持天数</span><b>'+state.day+' 天</b></div>'+
+   '<div class="rl"><span>最终总资产</span><b>'+money(netWorth())+'</b></div>'+
+   '<div class="rl"><span>历史最高</span><b>'+money(state.maxNet)+'</b></div>'+
+   '<div class="rl"><span>已转账给爸爸喵</span><b>'+(st.paidCount||0)+' 次 / '+money((st.paidCount||0)*10000)+'</b></div></div>'+
+  '<div class="mbtns"><button class="mbtn pri" onclick="restart()">重开一把</button></div>');
+ mark('header','action','perks');}
+function perkAction(k){
+ if(!state||!state.perks||!state.perks[k])return;
+ const st=state.perks[k],cfg=perkCfg(k);
+ if(!cfg)return;
+ if(st.retired)return toast('该事项已了结，不会再打扰你了喵','err');
+ if(st.type==='grant'){
+   if(state.day<st.nextDay)return toast('还需 '+(st.nextDay-state.day)+' 个交易日才能再要一次','err');
+   state.cash+=cfg.amount;st.nextDay=state.day+cfg.cd;st.paidCount++;
+   toast(cfg.text,'achv');
+   pushNews('家用','good',(cfg.news||cfg.text)+'（+'+money(cfg.amount)+'）');
+   mark('assets','header','perks','news');autoSave();return;}
+ if(st.type==='bill'){
+   if(state.cash<cfg.amount)return toast('可用资金不足，需 '+money(cfg.amount)+'。逾期 '+cfg.grace+' 天将强制扣除并加收 '+Math.round((cfg.lateRate||0)*100)+'% 滞纳金','err');
+   state.cash-=cfg.amount;st.dueDay=0;st.nextDay=state.day+cfg.cd;st.paidCount++;
+   toast(cfg.payText||('已缴纳 '+money(cfg.amount)),'ok');
+   pushNews('账单','bad','🏠 已缴纳房租水电费 '+money(cfg.amount)+'，下次到期第 '+st.nextDay+' 日');
+   mark('assets','header','perks','news');autoSave();return;}
+ if(st.type==='debt'){
+   if(!st.revealed)return toast('目前风平浪静，还没有来电喵','err');
+   if(state.cash<cfg.amount)return toast('可用资金不足，需 '+money(cfg.amount)+'！逾期 '+cfg.grace+' 天后果不堪设想','err');
+   state.cash-=cfg.amount;st.dueDay=0;st.nextDay=state.day+cfg.cd;st.paidCount++;
+   toast(cfg.payText,'achv');
+   pushNews('家用','bad','📞 已给爸爸喵转账 '+money(cfg.amount)+'，下次来电第 '+st.nextDay+' 日');
+   mark('assets','header','perks','news');autoSave();return;}}
+function perkBtnHtml(k,cfg,st){
+ if(!cfg||!st)return '';
+ let cls='pk',sub='',dis=false,label=cfg.label;
+ if(st.retired){cls+=' done';dis=true;sub='已了结 · 不再来电';}
+ else if(st.type==='grant'){
+   const ready=state.day>=st.nextDay;
+   if(ready){cls+=' ready';sub='可领取 '+money(cfg.amount);}
+   else{dis=true;sub='还需 '+(st.nextDay-state.day)+' 天';}}
+ else if(st.type==='bill'){
+   if(st.dueDay){
+     const left=st.dueDay+cfg.grace-state.day;
+     cls+=(left<=1?' warn':' urgent');
+     sub=left>0?('待缴 '+money(cfg.amount)+' · '+left+' 天后强扣'):'即将强制扣除';}
+   else{dis=true;sub='下次到期 第 '+st.nextDay+' 日';}}
+ else if(st.type==='debt'){
+   if(!st.revealed){dis=true;sub='风平浪静（第 '+cfg.revealDay+' 日起）';}
+   else if(st.dueDay){
+     const left=Math.max(0,st.dueDay+cfg.grace-state.day);
+     cls+=' urgent';sub='来电！欠 '+money(cfg.amount)+' · 剩 '+left+' 天';}
+   else{dis=true;sub='下次来电 第 '+st.nextDay+' 日';}}
+ return '<button class="'+cls+'" onclick="perkAction(\''+k+'\')" '+(dis?'disabled':'')+
+   ' title="'+label+' · '+diffName(state.diff)+'难度事件"><span class="pk-ic">'+cfg.icon+'</span>'+
+   '<span class="pk-tx"><b>'+label+'</b><i>'+sub+'</i></span></button>';}
+function renderPerkDock(){
+ const dock=$('perkDock');if(!dock)return;
+ if(!state||state.tutorial||state.mode!=='endless'||!DIFFS[state.diff]){dock.innerHTML='';dock.style.display='none';return;}
+ const d=DIFFS[state.diff];let html='';
+ if(d.perkA&&state.perks.A)html+=perkBtnHtml('A',d.perkA,state.perks.A);
+ if(d.perkB&&state.perks.B)html+=perkBtnHtml('B',d.perkB,state.perks.B);
+ dock.innerHTML=html;dock.style.display=html?'flex':'none';}
+
+/* ================= 新闻 ================= */
+const FLAVOR=['营业部大爷：盯了一上午盘，一笔没做，这叫定力','论坛热帖：满仓踏空是一种什么样的体验？',
+ '某券商研报标题火了：《一切还欠你一个晴天》','传言某人靠一只股票赚十倍，网友：他是做梦买的',
+ '外卖小哥也在打听股票，情绪指标似乎亮起了红灯','投资者致电上市公司：请问董事长打游戏吗？',
+ '营业部空调坏了，散户们一边擦汗一边聊K线','热搜话题：如果只买银行股，能提前退休吗？',
+ '基金经理直播卡成PPT，弹幕齐刷「加仓」','菜市场大妈：我卖白菜的时候就知道这股要涨',
+ '某券商晨会纪要流出，核心观点四个字：别追高','萌新发帖提问：一手是多少股？在线等，挺急的',
+ '行情软件弹窗：您关注的股票有异动，请保持冷静','老股民心得：少熬夜、多看盘、别动气',
+ '媒体评论：价值投资没有错，只是暂时没兑现','开户数又创新高，00后带着压岁钱进场了',
+ '投资群日常打卡：今天你猜对大盘方向了吗？','股吧新吧规：禁止骂人，只许哭穷'];
+function pushNews(tag,clsN,text){
+ state.news.unshift({day:state.day,
+  time:state.phase==='open'?clockLabel(state.tick):(state.phase==='closed'?'盘后':'盘前'),
+  tag,cls:clsN,text});
+ if(state.news.length>50)state.news.pop();mark('news');}
+function renderNews(){const pane=$('paneNews');const frag=document.createDocumentFragment();
+ state.news.forEach(n=>{const el=document.createElement('div');el.className='news-it';
+  el.innerHTML='<span class="tm">D'+n.day+' '+n.time+'</span><span class="ntag '+n.cls+'">'+n.tag+'</span>'+
+   (n.html||('<span class="tx">'+n.text+'</span>'));
+  frag.appendChild(el);});
+ pane.innerHTML='';pane.appendChild(frag);
+ updateTicker();}
+function updateTicker(){const el=$('tickerRun');if(!el||!state||!gold)return;
+ const parts=[];
+ const idx=calcIndex();
+ parts.push('📊 韭菜综合指数 '+idx.toFixed(2)+'（'+sgnPct((idx/state.indexOpen-1)*100)+'）');
+ const ri=regimeInfo();parts.push('大盘风向 '+ri.i+ri.t+'（情绪值 '+(state.regime||1).toFixed(2)+'）');
+ parts.push('🪙 千足金 买 '+fmt2(gold.price)+' / 卖 '+fmt2(goldSellPrice())+' 元每克');
+ parts.push('💰 可用资金 '+money(state.cash)+' ｜ 总资产 '+money(netWorth())+' / 目标 '+money(state.goal||CFG.winNet));
+ if(ipoFrozen()>0)parts.push('🧊 冻结申购款 '+money(ipoFrozen()));
+ state.news.slice(0,10).forEach(n=>parts.push('['+n.tag+'] '+n.text));
+ const txt=parts.join('　◆　');
+ el.innerHTML='<span>'+txt+'　◆　</span><span>'+txt+'　◆　</span>';
+ el.style.animation='none';void el.offsetWidth;
+ el.style.animation='tickMove '+Math.min(140,Math.max(28,parts.length*5.5))+'s linear infinite';}
+function buildBoard(gPrev){
+ const arr=stocks.filter(s=>!s.delisted&&s.listed).map(s=>({code:s.code,name:s.name,chg:s.price/s.prevClose-1}));
+ arr.push({code:GOLD_CODE,name:'千足金',chg:gold.price/gPrev-1});
+ arr.sort((a,b)=>b.chg-a.chg);
+ return{top:arr.slice(0,5),bottom:arr.slice(-5).reverse()};}
+function boardRows(arr){return arr.map((x,i)=>'<div class="bp-row"><span class="bp-rk">'+(i+1)+'</span>'+
+  '<span class="bp-nm" onclick="selectStock(\''+x.code+'\')" title="点击直达">'+x.name+'</span>'+
+  '<span class="bp-chg mono '+cls(x.chg)+'">'+sgnPct(x.chg*100)+'</span></div>').join('');}
+function showBoardPanel(b){
+ $('boardTitle').textContent='📊 第 '+state.day+' 日 收盘龙虎榜';
+ $('boardBody').innerHTML='<div class="bp-sec up">📈 涨幅榜 TOP5</div>'+boardRows(b.top)+
+  '<div class="bp-sec dn">📉 跌幅榜 TOP5</div>'+boardRows(b.bottom)+
+  '<div style="font-size:10px;color:var(--faint);margin-top:9px;text-align:center">点击名称直达行情 · 拖标题栏可移动窗口</div>';
+ $('boardPanel').classList.add('show');}
+function closeBoard(){$('boardPanel').classList.remove('show');}
+function reopenBoard(){if(!state||!state.lastBoard)return toast('还没有收盘龙虎榜（收盘后自动生成）','err');
+ showBoardPanel(state.lastBoard);}
+function pushBoardNews(b){
+ const rank=['①','②','③'];
+ const cell=x=>'<b style="color:var(--cyan);cursor:pointer" onclick="selectStock(\''+x.code+'\')" title="点击直达">'+
+   x.name+'</b> <span class="mono '+cls(x.chg)+'">'+sgnPct(x.chg*100)+'</span>';
+ const html='<span class="tx">📊 <b>今日龙虎榜</b>（点名字可直达）<br>'+
+  '<span class="up">涨幅榜</span>　'+b.top.slice(0,3).map((x,i)=>rank[i]+cell(x)).join('　')+
+  '<br><span class="dn">跌幅榜</span>　'+b.bottom.slice(0,3).map((x,i)=>rank[i]+cell(x)).join('　')+'</span>';
+ state.news.unshift({day:state.day,time:'15:00',tag:'龙虎榜',cls:'board',text:'今日龙虎榜已出',html:html});
+ if(state.news.length>50)state.news.pop();mark('news');}
+function applyShock(s,pct){if(s.delisted||inPanic(s))return;
+ const u=+(s.prevClose*(1+s.limit)).toFixed(2),d=+(s.prevClose*(1-s.limit)).toFixed(2);
+ s.price=+clamp(s.price*(1+pct),d,u).toFixed(2);s.high=Math.max(s.high,s.price);s.low=Math.min(s.low,s.price);
+ const c=s.candles[s.candles.length-1];if(c){c.c=s.price;c.h=Math.max(c.h,s.price);c.l=Math.min(c.l,s.price);}}
+function stockEvent(dir){const poolA=stocks.filter(x=>!x.delisted&&x.listed&&!inPanic(x));if(!poolA.length)return;
+ const s=pick(poolA);const x=20+Math.floor(Math.random()*180);
+ const cm=capMul(s),amp=clamp(Math.pow(cm,0.5),0.6,1.6);let txt;
+ if(dir>0){txt=pick([s.name+'公告：签订 '+x+' 亿元重大合同',s.name+'业绩预喜：净利润同比预增 '+x+'%',
+   '机构扎堆调研 '+s.name+'，行业景气度提升',s.name+'新品发布获好评，订单饱满']);
+   applyShock(s,(0.01+Math.random()*0.02)*amp);s.bias=(0.0015+Math.random()*0.0015)*amp;s.biasTicks=8+Math.floor(Math.random()*7);}
+ else{txt=pick([s.name+'业绩爆雷：净利润同比下滑 '+x+'%','监管问询函直指 '+s.name+' 财务疑点',
+   s.name+'大股东宣布减持，市场情绪承压','传 '+s.name+'产品抽检存疑，公司回应称一切正常']);
+   applyShock(s,-(0.01+Math.random()*0.02)*amp);s.bias=-(0.0015+Math.random()*0.0015)*amp;s.biasTicks=8+Math.floor(Math.random()*7);}
+ pushNews(dir>0?'利好':'利空',dir>0?'good':'bad',txt);}
+function marketEvent(){const poolA=stocks.filter(x=>!x.delisted&&x.listed&&!inPanic(x));if(!poolA.length)return;
+ const good=Math.random()<0.55;const x=2000+Math.floor(Math.random()*6000);
+ const txt=good?pick(['央行宣布降准，释放长期资金约 '+x+' 亿元','多项活跃资本市场举措落地，情绪回暖'])
+             :pick(['外围市场剧烈波动，避险情绪升温','主力资金净流出，权重股承压']);
+ poolA.forEach(s=>{s.bias+=(good?1:-1)*(0.0006+Math.random()*0.0006);s.biasTicks=Math.max(s.biasTicks,10);
+   applyShock(s,(good?1:-1)*(0.002+Math.random()*0.004));});
+ pushNews('政策',good?'good':'bad',txt);
+ if(good){goldShock(-(0.005+Math.random()*0.010));
+   gold.bias=-(0.0008+Math.random()*0.0008);gold.biasTicks=Math.max(gold.biasTicks,10);
+   pushNews('贵金属','bad','🪙 风险偏好回升，资金撤离避险资产，金价回落');}
+ else{goldShock(0.02+Math.random()*0.01);
+   gold.bias=0.0012+Math.random()*0.0010;gold.biasTicks=Math.max(gold.biasTicks,14);
+   pushNews('贵金属','good','🪙 避险资金疯狂涌入，金价应声大涨');}}
+function maybeNews(){const r=Math.random();
+ if(r<0.010)stockEvent(1);else if(r<0.020)stockEvent(-1);
+ else if(r<0.030)marketEvent();else if(r<0.130)pushNews('杂谈','fun',pick(FLAVOR));}
+
+/* ================= 小道消息 ================= */
+const RUMOR_TXT=['即将签下一笔大额订单，董事长亲自督战','有重大资产重组动作，机构已提前埋伏',
+ '拿到某大客户天价订单，业绩要起飞','新技术即将通过国家级认证','大股东私下放话准备增持',
+ '公司近期在悄悄回购股份','行业扶持政策即将落地，它是直接受益方','下季度业绩可能大幅超预期'];
+const RUMOR_REAL_TXT=['传闻属实，大单资金闻风涌入','消息落地，机构集体抢筹','利好兑现，股价一飞冲天','神秘资金扫货，封单越堆越厚'];
+const RUMOR_BOMB_TXT=['经查纯属子虚乌有，恐慌盘夺路而逃','消息证伪，昨日追高者全线被套','内部人士辟谣，股价跳水','传闻系恶意炒作，监管已介入'];
+function buyRumor(){if(!state.flags.rumor)return;
+ if(state.cash<CFG.rumorCost)return toast('可用资金不足（需要 ¥10,000）','err');
+ const activeCodes=new Set(state.rumors.filter(r=>r.code&&state.day<r.revealDay).map(r=>r.code));
+ const cand=stocks.filter(x=>!x.delisted&&x.listed&&!inPanic(x)&&!activeCodes.has(x.code));
+ if(!cand.length)return toast('当前没有可打听的标的','err');
+ state.cash-=CFG.rumorCost;
+ rollRumor(pick(cand));
+ mark('rumor','assets','header');toast('🕵️ 到手一条小道消息，2 个交易日后揭晓真伪','achv');autoSave();}
+function rollRumor(s){                       /* ★ 生成一条消息（真伪已定，2 个交易日后揭晓） */
+ const roll=Math.random();
+ const real=roll<0.5;
+ const kind=real?'real':(roll<0.75?'bomb':'nochange');
+ if(real){s.bias=0.001+Math.random()*0.001;s.biasTicks=Math.max(s.biasTicks,8+Math.floor(Math.random()*5));}
+ state.rumors.unshift({day:state.day,code:s.code,name:s.name,text:pick(RUMOR_TXT),real,kind,revealDay:state.day+2});
+ if(state.rumors.length>20)state.rumors.pop();
+ return state.rumors[0];}
+function renderRumors(){const box=$('rumorList');
+ if(!state.rumors.length){box.innerHTML='<div class="empty" style="padding:14px">还没买过消息</div>';return;}
+ box.innerHTML=state.rumors.slice(0,6).map(r=>{
+  let badge;
+  if(r.revealDay&&state.day>=r.revealDay){
+    badge=r.real?'<b style="color:var(--up)">✅ 真料已应验</b>'
+      :(r.kind==='bomb'?'<b style="color:var(--dn)">💥 假料 · 暴雷</b>'
+      :'<b style="color:var(--faint)">🌫️ 假料 · 空欢喜</b>');
+  }else{badge='<span class="dim">🔮 待验证（第 '+(r.revealDay||'?')+' 日揭晓）</span>';}
+  const body=r.code
+   ?'<b style="color:var(--cyan);cursor:pointer" onclick="selectStock(\''+r.code+'\')" title="点击直达该股">'+r.name+'</b>（'+r.code+'）'+r.text
+   :r.text;
+  return '<div class="rumor-it"><span class="tm">第'+r.day+'日 · 花费 ¥10,000 · '+badge+'</span>'+body+'</div>';}).join('');}
+function applyRumorEffects(){
+ state.rumors.forEach(r=>{
+   if(r.bombNext&&state.day===r.revealDay+1){
+     r.bombNext=false;
+     const s=getStock(r.code);
+     if(s&&!s.delisted&&!inPanic(s)){
+       applyShock(s,-(0.02+Math.random()*0.03));
+       s.bias=-(0.004+Math.random()*0.003);s.biasTicks=16+Math.floor(Math.random()*8);
+       if(s.todaySeries.length)s.todaySeries[s.todaySeries.length-1]=s.price;
+       pushNews('利空','bad',s.name+' 暴雷余波未平，股价继续下挫');}}
+   if(r.revealDay===state.day&&!r.applied){
+     r.applied=true;
+     const s=getStock(r.code);
+     if(!s||s.delisted||inPanic(s))return;
+     if(r.real){
+       applyShock(s,0.02+Math.random()*0.03);
+       s.bias=0.005+Math.random()*0.003;s.biasTicks=16+Math.floor(Math.random()*9);
+       if(s.todaySeries.length)s.todaySeries[s.todaySeries.length-1]=s.price;
+       pushNews('利好','good','📈 '+s.name+' 传闻应验！'+pick(RUMOR_REAL_TXT));
+     }else if(r.kind==='bomb'){
+       applyShock(s,-(0.04+Math.random()*0.04));
+       s.bias=-(0.005+Math.random()*0.004);s.biasTicks=20+Math.floor(Math.random()*10);
+       r.bombNext=true;
+       if(s.todaySeries.length)s.todaySeries[s.todaySeries.length-1]=s.price;
+       pushNews('利空','bad','💥 '+s.name+' 暴雷！'+pick(RUMOR_BOMB_TXT));}}
+ });}
+
+/* ================= 交易 ================= */
+function qtyVal(){const v=+$('qtyInput').value||0;
+ return state.selected===GOLD_CODE?Math.max(0,r2(v)):Math.max(0,Math.floor(v));}
+function stepQty(d){
+ if(state.selected===GOLD_CODE)$('qtyInput').value=Math.max(0,r2(qtyVal()+d));
+ else $('qtyInput').value=Math.max(0,qtyVal()+d*100);
+ updateTradePanel();}
+function record(side,s,q,p,u,cost){
+ const t={day:state.day,time:state.phase==='open'?clockLabel(state.tick):'09:30',
+   code:s.code,name:s.name,side,qty:q,price:p,unit:u||'股',cost:cost};
+ state.trades.unshift(t);if(state.trades.length>80)state.trades.pop();
+ if(side==='sell'&&typeof cost==='number'&&cost>0){
+   const rate=p/cost-1;
+   const snap={day:t.day,name:t.name,qty:q,unit:t.unit||'股',cost:cost,price:p,rate:rate};
+   if(!state.bestTrade||rate>state.bestTrade.rate)state.bestTrade=snap;
+   if(!state.worstTrade||rate<state.worstTrade.rate)state.worstTrade=snap;}
+ mark('trades');}
+/* ★ 统一买入（Asset 接口）：股票有涨跌停/手数/佣金，黄金无佣金无手数限制 */
+function doBuy(){if(state.phase!=='open')return toast('当前非盘中，请使用预下单','err');
+ const a=getTarget(state.selected);if(!a)return;
+ const isG=!!a.isGold;
+ if(!isG&&a.delisted)return;
+ if(!isG&&a.limitState<0)return toast('跌停封板，无法买入','err');
+ const q=qtyVal();if(q<=0)return toast(isG?'请输入克数':'请先输入数量','err');
+ if(!isG&&q%100!==0)return toast('买入须为 100 股的整数倍','err');
+ const amt=q*(isG?gold.price:a.price),fee=isG?0:buyFee(amt);
+ if(amt+fee>state.cash)return toast('可用资金不足','err');
+ state.cash-=amt+fee;
+ if(isG){const h=state.gold||(state.gold={qty:0,cost:0});
+  h.cost=(h.qty*h.cost+amt)/(h.qty+q);h.qty=r2(h.qty+q);}
+ else{const h=state.holdings[a.code]||{qty:0,cost:0};
+  h.cost=(h.qty*h.cost+amt+fee)/(h.qty+q);h.qty+=q;state.holdings[a.code]=h;}
+ record('buy',a,q,(isG?gold.price:a.price),isG?'克':'股');
+ toast(isG?'买入黄金 '+q+' 克 @ '+fmt2(gold.price):'买入成功：'+a.name+' ×'+q+' @ '+fmt2(a.price),'ok');
+ mark('assets','holdings','trade','header');autoSave();
+ if(!isG&&state.tutorial&&state.tutStep===2)advanceTutorial(3);}
+/* ★ 统一卖出（Asset 接口）：股票有佣金/印花税，黄金用卖出价（金价−点差） */
+function doSell(){if(state.phase!=='open')return toast('当前非盘中，请使用预下单','err');
+ const a=getTarget(state.selected);if(!a)return;
+ const isG=!!a.isGold;
+ if(!isG&&a.delisted)return;
+ const h=isG?state.gold:(state.holdings[a.code]||null),q=qtyVal();
+ if(!h||h.qty<=0)return toast(isG?'暂无黄金持仓':'该股暂无持仓','err');
+ if(q<=0)return toast(isG?'请输入克数':'请先输入数量','err');
+ if(q>(isG?h.qty+1e-9:h.qty))return toast('最多可卖 '+h.qty+' '+(isG?'克':'股'),'err');
+ const price=isG?goldSellPrice():a.price;
+ const amt=q*price,fee=isG?0:sellFee(amt);
+ const pnl=(price-h.cost)*q-fee;
+ const costSnap=h.cost;
+ state.cash+=amt-fee;h.qty=isG?r2(h.qty-q):(h.qty-q);
+ if(isG){if(h.qty<=0)state.gold=null;}
+ else{if(h.qty===0)delete state.holdings[a.code];}
+ record('sell',a,q,price,isG?'克':'股',costSnap);
+ toast((isG?'卖出黄金 '+q+' 克 @ '+fmt2(goldSellPrice()):'卖出成功：'+a.name+' ×'+q)+' ｜ 本笔盈亏 '+(pnl>=0?'+':'')+fmt2(pnl),pnl>=0?'ok':'err');
+ mark('assets','holdings','trade','header');autoSave();
+ if(!isG&&state.tutorial&&state.tutStep===3)graduate(pnl);}
+/* ★ 统一预下单（Asset 接口）：股票需 100 股整数倍且检查退市/跌停，黄金无此限制 */
+function preOrder(side){
+ const a=getTarget(state.selected);if(!a)return toast('标的不存在','err');
+ const isG=!!a.isGold,unit=isG?'克':'股';
+ if(!isG&&a.delisted)return toast('该股不可交易','err');
+ if(!isG&&side==='buy'&&inPanic(a))return toast('该股正在退市跌停，禁止买入','err');
+ const q=qtyVal();if(q<=0)return toast(isG?'请输入克数':'请先输入数量','err');
+ if(!isG&&q%100!==0)return toast('须为 100 股的整数倍','err');
+ if(side==='sell'){const av=sellableQty();
+   if(q>(isG?av+1e-9:av))return toast('可预卖 '+av+' '+unit+'（已扣除挂单中的数量）','err');}
+ else{if(state.preOrders.length>=8)return toast('预下单最多 8 条','err');
+   if(q*(isG?gold.price:a.price)*(isG?1:1.001)>state.cash-lockedBuyCash())return toast('可用资金不足','err');}
+ state.preOrders.push({code:a.code,side,qty:q});renderPreList();
+ const nm=isG?'黄金':a.name;
+ toast('已加入预下单：'+(side==='buy'?'买入':'卖出')+' '+nm+' ×'+q+(isG?' 克':''),'ok');
+ mark('trade','header');autoSave();}
+function delPre(i){state.preOrders.splice(i,1);renderPreList();mark('trade','header');autoSave();}
+function renderPreList(){const box=$('preList');
+ if(!state.preOrders.length){box.innerHTML='<div class="dim" style="font-size:11px;padding:4px 0">暂无 —— 盘前/收盘后可挂，开盘按开盘价成交</div>';return;}
+ box.innerHTML=state.preOrders.map((o,i)=>{
+   const isG=o.code===GOLD_CODE;
+   const st=isG?null:getStock(o.code);
+   const nm=isG?'🪙 黄金':(st?st.name:o.code);
+   return '<div class="pre-row"><span class="'+(o.side==='buy'?'up':'dn')+'" style="font-weight:700">'+(o.side==='buy'?'预买':'预卖')+'</span><span>'+nm+' ×'+o.qty+(isG?' 克':' 股')+'</span><button onclick="delPre('+i+')" title="撤单">×</button></div>';}).join('');}
+/* ★ 统一预下单执行（Asset 接口）：通过 getTarget 统一获取标的，黄金/股票共用成交逻辑 */
+function executePreOrders(){if(!state.preOrders.length)return;let ok=0;
+ for(const o of state.preOrders){
+  const a=getTarget(o.code);const isG=!!(a&&a.isGold);
+  if(!a||(!isG&&a.delisted)){toast('⚠️ 预下单已自动撤销：标的不存在或已退市','err');continue;}
+  if(!isG&&o.side==='buy'&&inPanic(a)){
+    toast('⚠️ 预买已自动撤销：'+a.name+' 进入退市跌停期，禁止买入','err');continue;}
+  const p=isG?gold.open:a.open;
+  if(o.side==='buy'){const amt=o.qty*p,fee=isG?0:buyFee(amt);
+    if(amt+fee>state.cash){toast('预下单失败：'+(isG?'黄金':a.name)+' 资金不足','err');continue;}
+    state.cash-=amt+fee;
+    if(isG){const h=state.gold||(state.gold={qty:0,cost:0});
+     h.cost=(h.qty*h.cost+amt)/(h.qty+o.qty);h.qty=r2(h.qty+o.qty);}
+    else{const h=state.holdings[a.code]||{qty:0,cost:0};
+     h.cost=(h.qty*h.cost+amt+fee)/(h.qty+o.qty);h.qty+=o.qty;state.holdings[a.code]=h;}
+    record('buy',a,o.qty,p,isG?'克':'股');ok++;}
+  else{const h=isG?state.gold:(state.holdings[o.code]||null);
+    if(!h||h.qty<(isG?o.qty-1e-9:o.qty)){toast('预下单失败：'+(isG?'黄金':a.name)+' 持仓不足','err');continue;}
+    const sp=isG?goldSellPrice():p,cs=h.cost;
+    const amt=o.qty*sp,fee=isG?0:sellFee(amt);
+    state.cash+=amt-fee;h.qty=isG?r2(h.qty-o.qty):(h.qty-o.qty);
+    if(isG){if(h.qty<=0)state.gold=null;}
+    else{if(h.qty===0)delete state.holdings[o.code];}
+    record('sell',a,o.qty,sp,isG?'克':'股',cs);ok++;}}
+ state.preOrders=[];renderPreList();
+ if(ok)toast('⏰ 开盘成交 '+ok+' 笔预下单（按开盘价）','ok');}
+
+/* ================= 事件系统 ================= */
+function announceEvent(e){
+ state.lastAnnounce=state.day;
+ if(e.type==='list'){
+  const p=pool.find(x=>x.code===e.code);if(!p)return;
+  pushNews('公告','good','🎉 新股申购开启：'+p.name+'（'+p.code+'），发行价 '+money(e.issuePrice)+'（参考市价 '+money(e.refPrice||p.price)+'），第 '+e.execDay+' 日上市');
+  showModal('<h2>🎉 新股申购开启</h2><div class="msub">'+p.name+'（'+p.code+'）即将上市，打新窗口开启</div>'+
+   '<div class="receipt">'+
+   '<div class="rl"><span>发行价</span><b>'+money(e.issuePrice)+'</b></div>'+
+   '<div class="rl"><span>参考市价</span><b>'+money(e.refPrice||p.price)+'</b></div>'+
+   '<div class="rl"><span>折价</span><b>约 8 折</b></div>'+
+   '<div class="rl"><span>上市日期</span><b>第 '+e.execDay+' 日</b></div></div>'+
+   '<p style="font-size:12px;color:var(--dim);line-height:1.9">在右侧「市场事件」面板申购（上限 10 万手）。申购即冻结资金，上市日按发行价成交入持仓，窗口期内可随时撤单退款。<b style="color:var(--gold)">上市首日以「参考市价」为昨收、在 ±'+Math.round(10*diffLimitMul())+'% 内开盘</b>——八折中签即有浮盈。</p>'+
+   '<p style="font-size:11px;color:var(--faint);line-height:1.7">💡 冻结的申购款始终计入你的「总资产」，全额打新不会让你破产；但冻结期间这笔钱不能用于买卖，请留意节奏。</p>'+
+   '<div class="mbtns"><button class="mbtn pri" onclick="hideModal()">去看看</button></div>');
+ }else{
+  const s=getStock(e.code);if(!s)return;
+  pushNews('公告','bad','⚠️ 退市预警：'+s.name+' 将于第 '+e.execDay+' 日退市，今日起连续一字跌停');
+  toast('⚠️ '+s.name+' 即将退市！','err');
+  showModal('<h2>⚠️ 退市预警</h2><div class="msub">'+s.name+'（'+s.code+'）因重大违规即将退市</div>'+
+   '<div class="receipt">'+
+   '<div class="rl"><span>退市日期</span><b>第 '+e.execDay+' 日</b></div>'+
+   '<div class="rl"><span>今日开始</span><b>连续一字跌停</b></div>'+
+   '<div class="rl"><span>到期清算</span><b>按届时价格 '+Math.round(CFG.delistSettle*100)+'%</b></div></div>'+
+   '<p style="font-size:12px;color:var(--dim);line-height:1.9">跌停期间仍可卖出（按跌停价成交），但禁止买入，已挂的预买单会自动撤销。若死拿到退市日，持仓将被强制清算。请尽快决策！</p>'+
+   '<div class="mbtns"><button class="mbtn pri" onclick="hideModal()">知道了</button></div>');
+ }
+ mark('events');}
+function maybeScheduleEvent(){
+ if(state.day<3)return;
+ if(state.lastAnnounce&&state.day<state.lastAnnounce+CFG.eventGap)return;
+ if(Math.random()>CFG.eventChance)return;
+ const canList=!state.events.some(e=>e.type==='list')&&canAddStock()&&
+   pool.some(p=>!p.listed&&!p.delisted&&!p.isDiv);
+ const victims=stocks.filter(s=>s.listed&&!s.isBase&&!s.isDiv&&!s.delisted&&!inPanic(s)&&
+   (state.day-(s.listDay||0))>=CFG.minLifespan&&!state.events.some(e=>e.code===s.code));
+ const canDelist=victims.length>0;
+ if(!canList&&!canDelist)return;
+ const lastExec=state.events.filter(e=>e.execDay<=state.day).pop();
+ const listW=canList&&(lastExec&&lastExec.type==='delist')?0.7:0.5;
+ const type=(canList&&canDelist)?(Math.random()<listW?'list':'delist'):(canList?'list':'delist');
+ if(type==='list'){
+  const cand=pool.filter(p=>!p.listed&&!p.delisted&&!p.isDiv);if(!cand.length)return;
+  const p=pick(cand);presimAsset(p);
+  const ref=+p.price.toFixed(2);
+  const disc=(DIFFS[state.diff]&&DIFFS[state.diff].ipoDiscount)||0.80;
+  const brk=(DIFFS[state.diff]&&DIFFS[state.diff].ipoBreak)||0;
+  let issue;
+  if(Math.random()<brk){issue=+(ref*(1.05+Math.random()*0.10)).toFixed(2);}
+  else{issue=Math.max(1,+(ref*disc).toFixed(2));}
+  state.events.push({type:'list',code:p.code,announceDay:state.day,execDay:state.day+2,
+                 issuePrice:issue,refPrice:ref});
+ }else{
+  const v=pick(victims);
+  state.events.push({type:'delist',code:v.code,announceDay:state.day,execDay:state.day+3});
+ }
+ const e=state.events[state.events.length-1];e.announced=true;announceEvent(e);}
+function maybeListDiv(){
+ if(state.day<2)return;
+ if(state.lastDivList&&state.day<state.lastDivList+CFG.divGap)return;
+ const cand=pool.filter(p=>p.isDiv&&!p.listed&&!p.delisted);
+ if(!cand.length)return;
+ if(!canAddStock())return;
+ if(Math.random()>CFG.divChance)return;
+ const n=Math.min(cand.length,1+Math.floor(Math.random()*3));
+ const used=[];
+ for(let i=0;i<n;i++){
+   if(!canAddStock())break;
+   const rest=cand.filter(p=>used.indexOf(p)<0);if(!rest.length)break;
+   const p=pick(rest);used.push(p);listDivStock(p);}
+ state.lastDivList=state.day;}
+function listDivStock(p){
+ if(p.listed)return false;
+ if(!canAddStock())return false;
+ presimAsset(p);
+ p.listed=true;p.listDay=state.day;p.delisted=false;p.limit=0.10*diffLimitMul();p.alertDay=0;p.isDiv=true;
+ if(p.div)p.divTimer=Math.max(1,Math.ceil(Math.random()*p.div.every));
+ stocks.push(p);buildWatchlist();syncCheat();
+ pushNews('公告','good','💰 高股息新股挂牌：'+p.name+'（'+p.code+'），每 '+p.div.every+' 个交易日每股派息 '+fmt2(p.div.per)+' 元，且永不退市');
+ toast('💰 派息股上市：'+p.name+'（'+p.code+'）','achv');
+ mark('watchlist','detail','assets','header');autoSave();
+ return true;}
+function execListing(e){
+ const p=pool.find(x=>x.code===e.code);if(!p)return;
+ const ref=(typeof e.refPrice==='number'&&e.refPrice>0)?+e.refPrice.toFixed(2)
+           :+((p.price||e.issuePrice)).toFixed(2);
+ const already=!!p.listed;
+ if(!already){
+  p.listed=true;p.listDay=state.day;p.delisted=false;p.limit=0.10*diffLimitMul();p.isBase=false;
+  p.candles=[];
+  if(p.div)p.divTimer=Math.max(1,Math.ceil(Math.random()*p.div.every));else p.divTimer=0;
+  stocks.push(p);}
+ const anchor=already?p.prevClose:ref;
+ p.prevClose=+anchor.toFixed(2);
+ const band=0.1*diffLimitMul();                 /* ★ 绝望档首日开盘带同步放宽 */
+ const lo=+(anchor*(1-band)).toFixed(2),hi=+(anchor*(1+band)).toFixed(2);
+ const op=+clamp(anchor*(1+gauss()*p.vol*2.5),lo,hi).toFixed(2);
+ p.open=op;p.price=op;p.high=op;p.low=op;p.todaySeries=[op];
+ p.limitState=0;p.limitNews=false;p.bias=0;p.biasTicks=0;p.alertDay=0;
+ p.openReady=state.day;
+ buildWatchlist();syncCheat();
+ const o=+(p.open||p.price).toFixed(2);
+ const mine=state.ipos.filter(x=>x.code===e.code);
+ state.ipos=state.ipos.filter(x=>x.code!==e.code);
+ let fillTxt='<p style="font-size:12px;color:var(--dim);margin:12px 0">你未参与本次申购。</p>';
+ if(mine.length){
+  let filled=0,amtAll=0,feeAll=0;
+  mine.forEach(o2=>{const amt=o2.qty*o2.price;
+    const fee=Math.min(buyFee(amt),Math.max(0,state.cash));state.cash-=fee;
+    const h=state.holdings[p.code]||{qty:0,cost:0};
+    h.cost=(h.qty*h.cost+amt+fee)/(h.qty+o2.qty);h.qty+=o2.qty;state.holdings[p.code]=h;
+    filled+=o2.qty;amtAll+=amt;feeAll+=fee;});
+  const hc=state.holdings[p.code];const hcPrice=hc?hc.cost:o;
+  fillTxt='<div class="receipt">'+
+   '<div class="rl"><span>中签数量</span><b>'+filled+' 股</b></div>'+
+   '<div class="rl"><span>成交金额</span><b>'+money(amtAll)+'</b></div>'+
+   '<div class="rl"><span>佣金</span><b>'+fmt2(feeAll)+'</b></div>'+
+   '<div class="rl"><span>持仓成本</span><b>'+fmt2(hcPrice)+'</b></div>'+
+   '<div class="rl"><span>开盘浮盈</span><b class="'+cls(o-hcPrice)+'">'+money((o-hcPrice)*filled)+'</b></div></div>';}
+ pushNews('公告','good','🔔 '+p.name+'（'+p.code+'）今日正式上市，开盘价 '+fmt2(o)+'（发行价 '+fmt2(e.issuePrice)+'）');
+ showModal('<h2>🔔 '+p.name+' 正式上市</h2><div class="msub">开盘价 '+fmt2(o)+' ｜ 发行价 '+fmt2(e.issuePrice)+' ｜ 参考市价 '+fmt2(ref)+'</div>'+fillTxt+
+  '<div class="mbtns"><button class="mbtn pri" onclick="hideModal()">知道了</button></div>');
+ mark('watchlist','detail','assets','holdings','events','header');autoSave();}
+function listStock(p,quiet){if(p.listed)return false;
+ if(!canAddStock()){if(!quiet)toast('在场股票已达上限 '+CFG.maxListed+' 只','err');return false;}
+ p.listed=true;p.listDay=state.day;p.isBase=false;p.delisted=false;p.limit=0.10*diffLimitMul();p.alertDay=0;
+ presimAsset(p);stocks.push(p);buildWatchlist();syncCheat();
+ if(!quiet){pushNews('公告','good','🎉 新股上市：'+p.name+'（'+p.code+'）今日挂牌');toast('🎉 新股上市：'+p.name,'ok');autoSave();}
+ mark('watchlist','detail','assets','header');
+ return true;}
+function executeDelist(s,opts){opts=opts||{};if(s.delisted)return;
+ s.delisted=true;s.listed=false;
+ state.events=state.events.filter(e=>e.code!==s.code);
+ let heldQty=0,settlePrice=0,heldAmt=0;
+ const h=state.holdings[s.code];
+ if(h&&h.qty>0){settlePrice=+(s.price*CFG.delistSettle).toFixed(2);
+   const amt=h.qty*settlePrice,fee=sellFee(amt);
+   state.cash+=amt-fee;heldQty=h.qty;heldAmt=amt-fee;
+   record('sell',s,h.qty,settlePrice,'股',h.cost);delete state.holdings[s.code];}
+ state.preOrders=state.preOrders.filter(o=>o.code!==s.code);
+ state.ipos=state.ipos.filter(o=>o.code!==s.code);
+ stocks=stocks.filter(x=>x.code!==s.code);
+ if(state.selected===s.code){const nxt=stocks.find(x=>!(x.cyb&&!state.flags.cyb));if(nxt)state.selected=nxt.code;}
+ buildWatchlist();syncCheat();
+ pushNews('公告','bad','🪦 '+s.name+'（'+s.code+'）正式退市，已摘牌');
+ if(heldQty>0){
+   showModal('<h2>🪦 '+s.name+' 退市清算</h2><div class="msub">'+s.name+'（'+s.code+'）已终止上市</div>'+
+   '<div class="receipt"><div class="rl"><span>持有数量</span><b>'+heldQty+' 股</b></div>'+
+   '<div class="rl"><span>退市前价格</span><b>'+fmt2(s.price)+'</b></div>'+
+   '<div class="rl"><span>清算价（'+Math.round(CFG.delistSettle*100)+'%）</span><b>'+fmt2(settlePrice)+'</b></div>'+
+   '<div class="rl"><span>清算到手</span><b>'+money(heldAmt)+'</b></div></div>'+
+   '<div class="mbtns"><button class="mbtn pri" onclick="hideModal()">知道了</button></div>');}
+ else if(opts.forceModal){
+   showModal('<h2>🪦 '+s.name+' 退市</h2><div class="msub">'+s.name+'（'+s.code+'）已终止上市</div>'+
+   '<p style="margin:14px 0;font-size:13px;line-height:1.9;color:var(--dim)">好在你未持有该股，未受波及。</p>'+
+   '<div class="mbtns"><button class="mbtn pri" onclick="hideModal()">知道了</button></div>');}
+ else{toast('🪦 '+s.name+' 已退市','err');}
+ renderPreList();invalidateAll();autoSave();}
+function focusEvent(code){
+ const s=getStock(code);
+ if(s&&!s.delisted){selectStock(code);return;}
+ const p=pool.find(x=>x.code===code);
+ if(!p){toast('该标的已不在市场中','err');return;}
+ const e=state.events.find(x=>x.code===code);
+ showModal('<h2>🎉 '+p.name+' · 打新资料</h2><div class="msub">'+p.code+' · '+p.sector+' · 尚未挂牌，暂无行情</div>'+
+  '<div class="receipt">'+
+  '<div class="rl"><span>发行价</span><b>'+(e?money(e.issuePrice):'--')+'</b></div>'+
+  '<div class="rl"><span>参考市价</span><b>'+money(e&&e.refPrice?e.refPrice:p.price)+'</b></div>'+
+  '<div class="rl"><span>上市日期</span><b>'+(e?'第 '+e.execDay+' 日':'待定')+'</b></div>'+
+  '<div class="rl"><span>涨跌幅限制</span><b>±'+Math.round(10*diffLimitMul())+'%（主板）</b></div>'+
+  '<div class="rl"><span>退市风险</span><b>有（非派息股）</b></div></div>'+
+  '<p style="font-size:12px;color:var(--dim);line-height:1.9">在下方「市场事件」面板填写数量后点「申购」，资金即刻冻结，上市日按发行价自动成交入持仓。冻结款计入总资产，撤单可全额退回。</p>'+
+  '<div class="mbtns"><button class="mbtn pri" onclick="hideModal()">知道了</button></div>');}
+function renderEventZone(){
+ const zone=$('eventZone');
+ const active=state.events.filter(e=>e.announced);
+ if(!active.length&&!state.ipos.length){zone.style.display='none';zone.innerHTML='';return;}
+ zone.style.display='';
+ let html='<div class="ez-title">📢 市场事件</div>';
+ active.forEach(e=>{
+  const left=e.execDay-state.day;
+  if(e.type==='delist'){
+   const s=getStock(e.code);const name=s?s.name:e.code;
+   const inPan=state.day>=e.announceDay;
+   html+='<div class="ez-item bad">⚠️ <b class="evlink" onclick="focusEvent(\''+e.code+'\')" title="点击直达">'+name+'</b> 将于第 '+e.execDay+' 日退市'+(left>0?'（还有 '+left+' 天）':'')+
+    (inPan?'<br><span class="up">连续跌停中！跌停可卖出但禁止买入，退市后仅按 30% 清算</span>'
+          :'<br><span class="dim">即将连续一字跌停</span>')+'</div>';
+  }else{
+   const p=pool.find(x=>x.code===e.code);const name=p?p.name:e.code;
+   html+='<div class="ez-item good">🎉 <b class="evlink" onclick="focusEvent(\''+e.code+'\')" title="点击查看打新资料">'+name+'</b> 发行价 <b>'+money(e.issuePrice)+'</b> · 参考市价 <b>'+money(e.refPrice||(p?p.price:0))+'</b> · 第 '+e.execDay+' 日上市'+(left>0?'（还有 '+left+' 天）':'')+'</div>';
+   html+='<div class="ipo-box"><div class="qty-row">'+
+    '<button class="qbtn" onclick="ipoStep(-100)">−</button>'+
+    '<input id="ipoQty" type="number" min="0" step="100" value="'+ipoQtyVal+'">'+
+    '<button class="qbtn" onclick="ipoStep(100)">＋</button></div>'+
+    '<div class="chips"><span class="lb">申购</span>'+
+    '<button class="chip b" onclick="setIpo(1000)">1000股</button>'+
+    '<button class="chip b" onclick="setIpo(10000)">1万股</button>'+
+    '<button class="chip b" onclick="setIpo(100000)">10万股</button>'+
+    '<button class="chip b" onclick="setIpoMax()">顶格</button></div>'+
+    '<button class="btn-buy" style="width:100%;margin-top:6px;letter-spacing:2px" onclick="subscribeIpo()">申 购（冻结资金）</button></div>';
+  }});
+ if(state.ipos.length){
+  html+='<div class="ez-title">📝 我的申购（上市日自动成交 · 冻结 '+money(ipoFrozen())+'）</div>';
+  state.ipos.forEach((o,i)=>{const p=pool.find(x=>x.code===o.code);const nm=p?p.name:o.code;
+   html+='<div class="pre-row"><span class="up" style="font-weight:700">已冻</span><span><b class="evlink" onclick="focusEvent(\''+o.code+'\')">'+nm+'</b> ×'+o.qty+' @ '+fmt2(o.price)+'</span><button onclick="cancelIpo('+i+')" title="撤单退款">×</button></div>';});}
+ zone.innerHTML=html;
+ const iq=$('ipoQty');
+ if(iq)iq.addEventListener('input',()=>{ipoQtyVal=Math.max(0,Math.floor(+iq.value||0));});}
+function ipoStep(d){const el=$('ipoQty');if(el)ipoQtyVal=Math.max(0,(+el.value||0)+d);renderEventZone();}
+function setIpo(v){ipoQtyVal=v;renderEventZone();}
+function setIpoMax(){const e=state.events.find(x=>x.type==='list');if(!e)return;
+ const maxByCash=Math.floor(Math.max(0,state.cash)/e.issuePrice/100)*100;
+ ipoQtyVal=Math.min(CFG.ipoCap,maxByCash);renderEventZone();}
+function subscribeIpo(){
+ const e=state.events.find(x=>x.type==='list');if(!e)return toast('当前无可申购的新股','err');
+ const q=Math.floor(+$('ipoQty').value||0);
+ if(q<=0)return toast('请输入申购数量','err');
+ if(q%100)return toast('须为 100 股的整数倍','err');
+ const ex=state.ipos.find(o=>o.code===e.code);
+ if((ex?ex.qty:0)+q>CFG.ipoCap)return toast('申购上限 100,000 手（10,000,000 股）','err');
+ const cost=q*e.issuePrice;
+ if(cost>state.cash)return toast('可用资金不足（申购款已即时冻结）','err');
+ state.cash-=cost;
+ if(ex)ex.qty+=q;else state.ipos.push({code:e.code,qty:q,price:e.issuePrice});
+ mark('assets','events','header','news');
+ const left=state.cash;
+ toast('申购成功：冻结 '+money(cost)+(left<1?'（现金已用尽，冻结款仍计入总资产）':''),'ok');
+ autoSave();}
+function cancelIpo(i){const o=state.ipos[i];if(!o)return;
+ state.cash+=o.qty*o.price;state.ipos.splice(i,1);
+ mark('assets','events','header');toast('已撤单，解冻 '+money(o.qty*o.price),'ok');autoSave();}
+
+/* ================= 回合推进 ================= */
+function schedule(){clearTimeout(timer);if(!state||state.phase!=='open'||state.paused)return;
+ timer=setTimeout(()=>{tickStep();schedule();},CFG.baseInterval/state.speed);}
+function nextDayVeil(){
+ if(veilBusy||!state||state.phase==='open')return;
+ veilBusy=true;
+ const nd=(state.phase==='closed')?state.day+1:state.day;
+ $('nightText').textContent='🌙 第 '+nd+' 日 · 拂晓将至';
+ const v=$('nightVeil');
+ v.classList.add('on');
+ setTimeout(()=>{
+   nextDay();
+   setTimeout(()=>{v.classList.remove('on');setTimeout(()=>{veilBusy=false;},850);},420);
+ },900);}
+/* ★ 统一开盘价生成（Asset 接口）：股票退市跌停 → 一字板；正常 → 高斯随机 ± vol*2.5 钳位于涨跌停；黄金 → vol*2.2 地板 50 */
+function generateOpen(a){
+ if(a.isGold){const go=+Math.max(50,a.prevClose*(1+gauss()*a.vol*2.2)).toFixed(2);
+  a.open=go;a.price=go;a.high=go;a.low=go;a.todaySeries=[go];return;}
+ if(inPanic(a)){const lp=+(a.prevClose*(1-a.limit)).toFixed(2);
+  a.open=lp;a.price=lp;a.high=lp;a.low=lp;a.todaySeries=[lp];a.limitState=-1;a.limitNews=false;return;}
+ const down=+(a.prevClose*(1-a.limit)).toFixed(2),up=+(a.prevClose*(1+a.limit)).toFixed(2);
+ const o=+clamp(a.prevClose*(1+gauss()*a.vol*2.5),down,up).toFixed(2);
+ a.open=o;a.price=o;a.high=o;a.low=o;a.todaySeries=[o];a.limitState=0;a.limitNews=false;}
+function nextDay(){if(state.phase==='open')return;
+ if(state.phase==='closed')state.day++;
+ state.phase='pre';
+ closeBoard();
+ updatePerks();                                       /* ★ 难度事件：账单到期 / 来电 / 强制扣除 */
+ if(state.flags.dead||state.flags.dadDead){                   /* 已被难度事件判死，本日不再开盘 */
+   state.paused=true;clearTimeout(timer);$('btnPause').textContent='▶';
+   renderActionBtns();invalidateAll();autoSave();return;}
+ state.events.filter(e=>e.type==='delist'&&e.execDay===state.day).slice().forEach(e=>{
+   state.events=state.events.filter(x=>x!==e);
+   const s=getStock(e.code);if(s)executeDelist(s,{forceModal:true});});
+ state.events.filter(e=>e.type==='list'&&e.execDay===state.day).slice().forEach(e=>{
+   state.events=state.events.filter(x=>x!==e);execListing(e);});
+ state.events.filter(e=>e.announceDay===state.day&&!e.announced).slice().forEach(e=>{e.announced=true;announceEvent(e);});
+ maybeScheduleEvent();
+ maybeListDiv();
+ /* ★ 统一开盘价生成：股票用涨跌停限制钳位（vol*2.5），黄金用最低价 50 地板（vol*2.2） */
+ stocks.forEach(s=>{
+  if(!s.listed||s.delisted)return;
+  if(s.openReady===state.day)return;
+  generateOpen(s);});
+ generateOpen(gold);
+ applyRumorEffects();
+ state.events.forEach(e=>{if(e.type==='delist'&&state.day===e.announceDay&&!e.panicNews){e.panicNews=true;
+   const s=getStock(e.code);if(s)pushNews('跌停','bad',s.name+' 一字跌停开盘，退市倒计时开始');}});
+ executePreOrders();
+ state.phase='open';state.tick=0;
+ const modalUp=modalOpen();
+ state.paused=modalUp;modalResume=modalUp;
+ $('btnPause').textContent=state.paused?'▶':'⏸';
+ state.startOfDayNet=netWorth();state.indexOpen=calcIndex();
+ banner('第 '+state.day+' 日 · 开 盘');
+ renderActionBtns();
+ if(!state.paused)schedule();
+ invalidateAll();autoSave();
+ if(state.tutorial&&state.tutStep===1)advanceTutorial(2);}
+function tickStep(){state.tick++;
+ for(const s of stocks){if(s.delisted||!s.listed)continue;
+  if(inPanic(s)){
+   if((state.tick-1)%CFG.candleTicks===0){s.candles.push({o:s.price,h:s.price,l:s.price,c:s.price});
+     if(s.candles.length>CFG.maxCandles)s.candles.shift();}
+   s.limitState=-1;
+   s.todaySeries.push(s.price);
+   if(s.todaySeries.length>CFG.ticksPerDay+2)s.todaySeries.shift();
+   continue;}
+  const isNew=(state.tick-1)%CFG.candleTicks===0;
+  if(s.shockTicks>0)s.shockTicks--;else if(Math.random()<0.03){s.shockTicks=8+Math.floor(Math.random()*13);s.shockMul=3+Math.random()*2;}
+  const cm=capMul(s);
+  const shockAmp=s.shockTicks>0?s.shockMul*Math.max(0.7,Math.min(1.5,Math.pow(cm,0.5))):1;
+  const effVol=s.vol*cm*shockAmp;
+  let r=s.drift*state.regime*diffDriftMul()+gauss()*effVol;
+  if(s.anchor>0){const ratio=s.price/s.anchor;
+   if(ratio>2)r-=0.0003*(ratio-2);
+   else if(ratio<0.3)r+=0.0003*(0.3-ratio);}
+  if(s.biasTicks>0){r+=s.bias;s.biasTicks--;if(!s.biasTicks)s.bias=0;}
+  const u=+(s.prevClose*(1+s.limit)).toFixed(2),d=+(s.prevClose*(1-s.limit)).toFixed(2);
+  const p=+clamp(s.price*(1+r),d,u).toFixed(2);
+  if(isNew){s.candles.push({o:s.price,h:Math.max(s.price,p),l:Math.min(s.price,p),c:p});
+    if(s.candles.length>CFG.maxCandles)s.candles.shift();}
+  else{const c=s.candles[s.candles.length-1];if(c){c.c=p;c.h=Math.max(c.h,p);c.l=Math.min(c.l,p);}}
+  s.price=p;s.high=Math.max(s.high,p);s.low=Math.min(s.low,p);
+  s.todaySeries.push(p);if(s.todaySeries.length>CFG.ticksPerDay+2)s.todaySeries.shift();
+  const ls=p>=u?1:(p<=d?-1:0);
+  if(ls!==0&&s.limitState!==ls&&!s.limitNews){s.limitNews=true;
+    pushNews(ls>0?'涨停':'跌停',ls>0?'good':'bad',s.name+(ls>0?' 封死涨停':' 封死跌停')+'！');
+    if(state.holdings[s.code]&&state.holdings[s.code].qty>0)
+      toast('⚠️ 持仓异动：'+s.name+(ls>0?' 封死涨停，考虑止盈':' 封死跌停，注意风险'),ls>0?'ok':'err');}
+  s.limitState=ls;
+  if(state.holdings[s.code]&&state.holdings[s.code].qty>0&&s.alertDay!==state.day){
+    const cp=(p/s.prevClose-1)*100;
+    if(Math.abs(cp)>=CFG.alertStock){s.alertDay=state.day;
+      toast('📢 持仓提醒：'+s.name+' 今日已'+(cp>0?'上涨':'下跌')+' '+Math.abs(cp).toFixed(1)+'%',cp>0?'ok':'err');}}}
+ goldTick();
+ maybeNews();
+ mark('header','watchlist','detail','trade','assets','holdings');
+ if(state.tick>=CFG.ticksPerDay)closeDay();}
+function closeDay(){clearTimeout(timer);
+ state.indexLevel=calcIndex();          /* ★ 收盘定格指数基准（须在 prevClose 刷新前） */
+ const gPrev=gold.prevClose;
+ const board=buildBoard(gPrev);
+ stocks.forEach(s=>{if(s.delisted||!s.listed)return;
+   if(s.div&&state.holdings[s.code]&&state.holdings[s.code].qty>0){s.divTimer--;
+     if(s.divTimer<=0){const inc=+(state.holdings[s.code].qty*s.div.per).toFixed(2);state.cash+=inc;s.divTimer=s.div.every;
+       pushNews('公告','good','💰 '+s.name+' 派息到账：你获得 '+money(inc));}}
+   s.prevClose=s.price;s.bias=0;s.biasTicks=0;s.openReady=0;});
+ const net=netWorth();
+ gold.prevClose=gold.price;gold.bias=0;gold.biasTicks=0;
+ const gRet=gold.price/gPrev-1;
+ if(Math.abs(gRet)>0.015)pushNews('贵金属',gRet>0?'good':'bad',
+   '🪙 金价今日'+(gRet>0?'大涨':'大跌')+' '+sgnPct(gRet*100)+'，收于 '+fmt2(gold.price)+' 元/克');
+ state.regime=clamp((state.regime||1)*0.9+0.1+gauss()*0.07,0.5,1.7);
+ const idx=calcIndex();
+ pushNews('杂谈','fun',pick(FLAVOR));
+ pushBoardNews(board);
+ state.lastBoard=board;
+ state.phase='closed';banner('第 '+state.day+' 日 · 收 市');
+ showBoardPanel(board);
+ const dayRet=net/state.startOfDayNet-1;
+ toast('收市：指数 '+sgnPct((idx/state.indexOpen-1)*100)+' ｜ 金价 '+sgnPct(gRet*100)+' ｜ 你的今日 '+sgnPct(dayRet*100),dayRet>=0?'ok':'err');
+ renderActionBtns();invalidateAll();autoSave();}
+function togglePause(){if(state.phase!=='open')return;
+ if(modalOpen())return;
+ state.paused=!state.paused;
+ $('btnPause').textContent=state.paused?'▶':'⏸';state.paused?clearTimeout(timer):schedule();mark('header');phaseBtn();}
+function mainAction(){if(state.phase==='open'){if(state.paused&&!state.flags.dead&&!state.flags.dadDead){state.paused=false;$('btnPause').textContent='⏸';schedule();phaseBtn();}return;}nextDayVeil();}
+
+/* ================= ★ 主界面 / 难度选择 ================= */
+function showMainMenu(){
+ const canCont=!!LS.get(SAVEKEY)&&!!state&&!state.flags.dead&&!state.flags.dadDead;
+ showModal(
+ '<div class="mm-hero"><div class="lg">'+(APP_LOGO||'📈')+'</div><h2>韭菜翻身记</h2>'+
+ '<div class="sb">单机炒股模拟器 · v'+APP_VERSION+' · 纯属虚构</div></div>'+
+ '<div class="mm-grid">'+
+  '<div class="mm-card off" onclick="showStoryTeaser()"><div class="ic">📖</div><div class="tt">剧情模式</div>'+
+   '<div class="ds">跟随主角从负债累累到翻身封神的完整故事线，含人物羁绊与多结局分支</div>'+
+   '<div class="tg soon">暂未开发 · 敬请期待</div></div>'+
+  '<div class="mm-card" onclick="showDiffSelect()"><div class="ic">♾️</div><div class="tt">无尽模式</div>'+
+   '<div class="ds">四档难度自由开局：简单 120 万 / 中等 80 万 / 困难 50 万 / 绝望 20 万，目标均为 200 万</div>'+
+   '<div class="tg hot">可游玩</div></div>'+
+ '</div>'+
+ (canCont?'<div class="mbtns"><button class="mbtn pri" onclick="continueRun()">▶ 继续第 '+state.day+' 日 · '+diffName(state.diff)+'难度</button></div>':'')+
+ '<div class="mbtns">'+
+  '<button class="mbtn ghost" onclick="openTutorial()">🎓 教程</button>'+
+  '<button class="mbtn ghost" onclick="showChangelog()">📜 日志</button>'+
+  '<button class="mbtn ghost" onclick="showAbout()">ℹ️ 关于</button></div>'+
+ (canCont?'<p style="font-size:10.5px;color:var(--faint);text-align:center;margin-top:10px;line-height:1.7">继续存档将保留当前进度；另选难度开局会<b class="up">清空当前存档</b>。</p>':''),
+ true,true);}
+function showStoryTeaser(){
+ showModal('<div class="mm-hero"><div class="lg">📖</div><h2>剧情模式</h2>'+
+  '<div class="sb">暂未开发 · 敬请期待</div></div>'+
+  '<p style="margin:14px 0;font-size:12.5px;line-height:2;color:var(--dim);text-align:center">'+
+  '故事线、人物羁绊与多结局分支正在打磨中喵。<br>当前版本请先游玩 <b class="gold">「无尽模式」</b>。</p>'+
+  '<div class="mbtns"><button class="mbtn pri" onclick="showMainMenu()">← 返回主界面</button></div>',true,true);}
+function showDiffSelect(){
+ const cards=DIFF_ORDER.map(k=>{const d=DIFFS[k];
+   return '<div class="df-card" onclick="startRun(\''+k+'\')">'+
+    '<span class="ic">'+d.icon+'</span><span class="bd">'+
+    '<span class="nm">'+d.name+'<span class="tg">'+d.tag+'</span></span>'+
+    '<span class="mt">起始 '+money(d.cash)+' → 目标 '+money(d.goal)+'</span>'+
+    '<ul>'+(d.rules||[]).map(r=>'<li>'+r+'</li>').join('')+'</ul></span></div>';}).join('');
+ showModal('<h2>♾️ 无尽模式 · 选择难度</h2><div class="msub">目标均为总资产 '+money(CFG.winNet)+'；难度影响起始资金、场外事件与波动幅度（绝望档全场涨跌幅翻倍）</div>'+
+  '<div class="df-list">'+cards+'</div>'+
+  '<div class="mbtns"><button class="mbtn ghost" onclick="showMainMenu()">← 返回主界面</button></div>',true,true);}
+function startRun(diff){
+ if(!DIFFS[diff])diff='normal';
+ if(LS.get(SAVEKEY)&&state){
+   showModal('<h2>⚠️ 开始新的一局？</h2><div class="msub">当前存档（第 '+state.day+' 日 · '+diffName(state.diff)+'难度 · 总资产 '+money(netWorth())+'）将被覆盖，无法恢复</div>'+
+    '<div class="mbtns"><button class="mbtn ghost" onclick="showDiffSelect()">再想想</button>'+
+    '<button class="mbtn pri" onclick="doStartRun(\''+diff+'\')">覆盖并开局</button></div>',false,true);return;}
+ doStartRun(diff);}
+function doStartRun(diff){
+ hideModal();LS.del(SAVEKEY);
+ lastDiff=(DIFFS[diff]&&DIFF_ORDER.indexOf(diff)>=0)?diff:lastDiff;
+ newGame(diff);showIntro();}
+function continueRun(){hideModal();mark('perks','header','assets');}
+
+/* ================= 新手教程 ================= */
+function startTutorial(){hideModal();clearTimeout(timer);showTutConcept();}
+function showTutConcept(){
+ showModal('<h2>📚 三分钟搞懂炒股</h2><div class="msub">傻子也能学会的低买高卖</div>'+
+  '<div class="receipt">'+
+  '<div class="rl"><span>🔴 红色数字</span><b class="up">涨 = 变贵了</b></div>'+
+  '<div class="rl"><span>🟢 绿色数字</span><b class="dn">跌 = 变便宜了</b></div></div>'+
+  '<p style="font-size:13px;line-height:2;color:var(--dim)">炒股跟摆摊卖菜一个道理：<br>'+
+  '<b>便宜的时候进货（买），贵的时候出手（卖），差价就是你的利润。</b><br>'+
+  '所以口诀就八个字——<b class="up">绿买红卖 · 低买高卖</b>。</p>'+
+  '<p style="font-size:13px;line-height:2;color:var(--up)">⚠️ 千万别反过来：红的时候追高买、绿的时候恐慌卖，那是韭菜的标准死法！</p>'+
+  '<div class="mbtns"><button class="mbtn pri" onclick="beginTutorial()">我懂了，开始实操 →</button></div>');}
+function beginTutorial(){hideModal();newGame('tutor');state.tutorial=true;state.tutStep=1;showTutStep(1);}
+function showTutStep(n){
+ const txt={
+  1:'🎓 第 1/3 步 · <b>开盘</b>：点右侧金色按钮「🔔 开始交易」。开盘后盯紧颜色：<b class="up">红=涨</b>、<b class="dn">绿=跌</b>。',
+  2:'🎓 第 2/3 步 · <b>低买</b>：左侧任选一只股票，下方输入 100，点红色「买 入」。<br>记住：<b class="dn">趁绿（便宜）的时候买</b>，买入价就是你的成本。',
+  3:'🎓 第 3/3 步 · <b>高卖</b>：现在点绿色「卖 出」。<br>如果卖价比刚才的买价高，你就赚到了差价——<b class="up">这就是低买高卖！</b>'};
+ if(txt[n]){$('tutText').innerHTML=txt[n];$('tutBar').style.display='block';}
+ else{$('tutBar').style.display='none';}}
+function advanceTutorial(n){state.tutStep=n;showTutStep(n);toast('🎓 教程进度更新','achv');}
+function graduate(pnl){
+ state.tutStep=4;$('tutBar').style.display='none';
+ const earned=(typeof pnl==='number'&&pnl>=0);
+ const amt=(typeof pnl==='number')?fmt2(Math.abs(pnl)):'0.00';
+ const line=earned
+  ?('🎉 漂亮！这笔你赚了 <b class="up">¥'+amt+'</b>。记住这种感觉：<b>买得便宜、卖得贵</b>，差价进口袋——这就是低买高卖！')
+  :('📉 这笔你亏了 <b class="dn">¥'+amt+'</b>。别灰心——多半是买贵了或卖早了。<br>记住口诀：<b class="up">绿买红卖</b>，跌的时候买、涨起来再卖。多练几次就懂了！');
+ showModal('<h2>🎓 恭喜毕业！</h2><div class="msub">你已经完成了第一笔完整交易</div>'+
+  '<p style="margin:14px 0;font-size:13px;line-height:2;color:var(--dim)">'+line+'</p>'+
+  '<div class="receipt">'+
+  '<div class="rl"><span>炒股口诀</span><b>绿买红卖 · 低买高卖</b></div>'+
+  '<div class="rl"><span>红色 = 涨</span><b class="up">变贵 · 适合卖</b></div>'+
+  '<div class="rl"><span>绿色 = 跌</span><b class="dn">便宜 · 适合买</b></div></div>'+
+  '<div class="mbtns"><button class="mbtn pri" onclick="restartFormal()">🚀 选择难度，开始正式游戏</button></div>');}
+function restartFormal(){hideModal();newGame(lastDiff);showMainMenu();}
+
+/* ================= 渲染函数 ================= */
+const U={};
+function buildWatchlist(){
+ if(!state)return;
+ const box=$('wlList');box.innerHTML='';U.rows={};
+ const grp=t=>{const g=document.createElement('div');g.className='grp-head';g.textContent=t;box.appendChild(g);};
+ const row=s=>{const r=document.createElement('div');r.className='wl-row';r.dataset.code=s.code;
+   const lock=(s.cyb&&!state.flags.cyb)?' 🔒':'';
+   const dv=s.div?'<span class="divtag" title="派息股 · 永不退市">息</span>':'';
+   r.innerHTML='<div><div class="wl-nm">'+s.name+dv+lock+'</div><div class="wl-cd">'+s.code+(s.cyb?' · 创':'')+(s.isBase?'':' · 新')+'</div></div><div class="wl-px mono"></div><div class="wl-chg mono"></div>';
+   r.onclick=()=>selectStock(s.code);box.appendChild(r);
+   U.rows[s.code]={el:r,px:r.querySelector('.wl-px'),chg:r.querySelector('.wl-chg')};
+   if(s.cyb&&!state.flags.cyb)r.classList.add('locked');};
+ grp('贵金属 · 避险资产');
+ const gr=document.createElement('div');gr.className='wl-row au';gr.dataset.code=GOLD_CODE;
+ gr.innerHTML='<div><div class="wl-nm">🪙 传世之宝9999千足金</div><div class="wl-cd">AU9999 · 无涨跌停 · 点差'+CFG.goldSpread+'元</div></div><div class="wl-px mono"></div><div class="wl-chg mono"></div>';
+ gr.onclick=()=>selectStock(GOLD_CODE);box.appendChild(gr);
+ U.rows[GOLD_CODE]={el:gr,px:gr.querySelector('.wl-px'),chg:gr.querySelector('.wl-chg')};
+ THEMES.forEach(t=>{const list=stocks.filter(s=>s.sector===t&&s.listed&&!s.cyb&&!s.delisted);if(list.length){grp('主板 · '+t);list.forEach(row);}});
+ const cybList=stocks.filter(s=>s.cyb&&s.listed&&!s.delisted);
+ if(cybList.length){const cl='±'+Math.round(20*diffLimitMul())+'%';grp(state.flags.cyb?'创业板 · '+cl:'创业板 · '+cl+'（50万解锁）');cybList.forEach(row);}
+ if(U.rows[state.selected])U.rows[state.selected].el.classList.add('sel');
+ updateWatchlist();
+}
+function selectStock(code){
+ if(code===GOLD_CODE){
+   state.selected=GOLD_CODE;
+   Object.values(U.rows).forEach(r=>r.el.classList.remove('sel'));
+   if(U.rows[GOLD_CODE])U.rows[GOLD_CODE].el.classList.add('sel');
+   HV.k=HV.f=null;$('qtyInput').step='0.01';$('qtyInput').value=1;
+   mark('detail','trade');return;}
+ const s=getStock(code);if(!s)return;
+ if(s.delisted){toast(s.name+' 已退市','err');return;}
+ if(s.cyb&&!state.flags.cyb){toast('🔒 创业板未开通：需 '+money(CFG.cybUnlock),'err');return;}
+ state.selected=code;state.chartOffset=0;
+ Object.values(U.rows).forEach(r=>r.el.classList.remove('sel'));
+ if(U.rows[code])U.rows[code].el.classList.add('sel');
+ HV.k=HV.f=null;$('qtyInput').step='100';$('qtyInput').value=100;mark('detail','trade');}
+function flash(el,dir){if(!el.animate)return;
+ try{el.animate([{textShadow:'0 0 12px '+(dir>0?PAL.up:PAL.dn)},{textShadow:'none'}],{duration:450});}catch(e){}}
+function regimeInfo(){const rg=state.regime||1;
+ if(rg>=1.25)return{i:'🔥',t:'强势多头',c:'var(--up)'};
+ if(rg>=1.08)return{i:'📈',t:'偏多',c:'var(--up)'};
+ if(rg>0.92)return{i:'➖',t:'震荡',c:'var(--dim)'};
+ if(rg>0.75)return{i:'📉',t:'偏空',c:'var(--dn)'};
+ return{i:'🧊',t:'弱势空头',c:'var(--dn)'};}
+function regimeLabel(){const r=regimeInfo();return[r.i+' 大盘风向：'+r.t,r.c];}
+function updateHeader(){const idx=calcIndex(),chg=idx/state.indexOpen-1;
+ $('mhIndex').textContent=idx.toFixed(2);$('mhIndex').className='vl mono '+cls(chg);
+ $('mhIndexChg').textContent=sgnPct(chg*100);$('mhIndexChg').className='sm mono '+cls(chg);
+ const ri=regimeInfo();
+ $('mhRegime').innerHTML='<span style="color:'+ri.c+'">'+ri.i+' '+ri.t+'</span>';
+ $('mhRegimeSub').textContent='情绪值 '+(state.regime||1).toFixed(2);
+ $('mhCash').textContent=money(state.cash);
+ $('mhCash').style.color=state.cash<0?'var(--up)':'var(--cyan)';
+ const frozen=lockedBuyCash()+ipoFrozen();
+ $('mhCashSub').textContent=frozen>0.5?('已冻结 '+money(frozen)+'（计入总资产）'):(state.cash<0?'⚠️ 欠款中，请卖股回补':'无冻结资金');
+ $('mhDay').textContent='第 '+state.day+' 日';
+ $('mhClock').textContent=state.phase==='open'?clockLabel(state.tick):(state.phase==='closed'?'15:00 已收市':'09:15 盘前');
+ $('mhNet').textContent=money(netWorth());
+ const bs=$('brandSub');
+ if(bs)bs.textContent=state.tutorial?'单机炒股模拟器 · 新手教程局':'单机炒股模拟器 · '+diffName(state.diff)+'难度';
+ const fg=$('footGoal');
+ if(fg)fg.textContent='🎯 目标 '+money(state.goal||CFG.winNet)+' · '+diffName(state.diff)+'难度';
+ const st=$('mhState'),dot=$('liveDot');dot.className='livedot';
+ if(state.phase==='open'){st.textContent=state.paused?'已暂停':'交易中';if(state.paused)dot.classList.add('paused');}
+ else if(state.phase==='closed'){st.textContent='已收市';dot.classList.add('closed');}
+ else{st.textContent='盘前集合';dot.classList.add('closed');}}
+function updateGoldRow(){const r=U.rows[GOLD_CODE];if(!r)return;
+ const chg=(gold.price/gold.prevClose-1)*100;
+ const old=prevPx[GOLD_CODE];
+ r.px.textContent=fmt2(gold.price);r.px.className='wl-px mono '+cls(chg);
+ if(old!==undefined&&old!==gold.price)flash(r.px,gold.price-old);
+ prevPx[GOLD_CODE]=gold.price;
+ r.chg.textContent=sgnPct(chg);r.chg.className='wl-chg mono '+cls(chg);}
+function updateWatchlist(){let up=0,dn=0;
+ for(const s of stocks){const r=U.rows[s.code];if(!r)continue;
+  const chg=(s.price/s.prevClose-1)*100;
+  if(s.limitState>0)up++;if(s.limitState<0)dn++;
+  const old=prevPx[s.code];
+  r.px.textContent=fmt2(s.price);r.px.className='wl-px mono '+cls(chg);
+  if(old!==undefined&&old!==s.price)flash(r.px,s.price-old);
+  prevPx[s.code]=s.price;
+  r.chg.className='wl-chg mono '+cls(chg)+(s.limitState!==0?' limit':'');
+  r.chg.textContent=s.limitState>0?'涨停':(s.limitState<0?'跌停':sgnPct(chg));}
+ updateGoldRow();
+ $('wlLimit').textContent='涨停 '+up+' / 跌停 '+dn;}
+const DSC={};
+function buildDetailShell(){const box=$('dStats');box.innerHTML='';
+ [['今开','open'],['最高','high'],['最低','low'],['昨收','prev'],['涨停价','up'],['跌停价','down'],['振幅','amp']].forEach(d=>{
+  const cell=document.createElement('div');cell.className='d-stat';
+  cell.innerHTML='<div class="k">'+d[0]+'</div><div class="v mono"></div>';
+  box.appendChild(cell);DSC[d[1]]={k:cell.querySelector('.k'),v:cell.querySelector('.v')};});}
+function setStat(k,label,v,c){const e=DSC[k];if(!e)return;e.k.textContent=label;e.v.textContent=v;e.v.className='v mono '+c;}
+/* ★ 统一详情渲染（Asset 接口）：黄金/股票共享 price/prevClose/open/high/low 等字段 */
+function renderDetail(a){
+ const chg=a.price-a.prevClose,pct=chg/a.prevClose*100;
+ $('dName').textContent=a.name;$('dName').style.fontSize=a.isGold?'15px':'';
+ $('dCode').textContent=a.isGold?'AU9999':a.code;
+ $('dSector').textContent=a.isGold?'贵金属 · 避险资产':(a.cyb?'创业板 · '+a.sector:'主板 · '+a.sector);
+ const ct=$('dCapTag');
+ if(!a.isGold&&a.shares){ct.style.display='';ct.textContent='市值 '+fmtCap(a);}
+ else ct.style.display='none';
+ const dt=$('dDivTag');
+ if(!a.isGold&&a.div){dt.style.display='';
+   dt.textContent='💰 派息 '+fmt2(a.div.per)+'/'+a.div.every+'日'+(state.holdings[a.code]?' · 距下次 '+a.divTimer+' 日':'');
+   dt.title='派息股：持有即按周期自动派现，且永不被退市';}
+ else dt.style.display='none';
+ const lt=$('dLimitTag');
+ if(!a.isGold&&a.limitState!==0){lt.style.display='';lt.textContent=a.limitState>0?'🔥 涨停':'🧊 跌停';
+   lt.style.borderColor=lt.style.color=a.limitState>0?'var(--up)':'var(--dn)';}
+ else lt.style.display='none';
+ $('dPrice').textContent=fmt2(a.price);$('dPrice').className='big mono '+cls(pct);
+ $('dChg').innerHTML='<span class="mono '+cls(pct)+'">'+(chg>=0?'+':'')+fmt2(chg)+'　'+sgnPct(pct)+(a.isGold?'　元/克':'')+'</span>';
+ const amp=(a.high-a.low)/a.prevClose*100;
+ setStat('open','今开',fmt2(a.open),cls(a.open-a.prevClose));
+ setStat('high','最高',fmt2(a.high),cls(a.high-a.prevClose));
+ setStat('low','最低',fmt2(a.low),cls(a.low-a.prevClose));
+ setStat('prev','昨收',fmt2(a.prevClose),'');
+ if(a.isGold){setStat('up','买入价',fmt2(a.price),'up');setStat('down','卖出价',fmt2(goldSellPrice()),'dn');}
+ else{setStat('up',a.cyb?'涨停价 '+Math.round(a.limit*100)+'%':'涨停价',fmt2(+(a.prevClose*(1+a.limit)).toFixed(2)),'up');
+  setStat('down','跌停价',fmt2(+(a.prevClose*(1-a.limit)).toFixed(2)),'dn');}
+ setStat('amp','振幅',amp.toFixed(2)+'%','');
+ drawChart();}
+function updateDetail(){
+ let a=getTarget(state.selected);
+ if(!a){a=stocks[0];if(!a)return;state.selected=a.code;}
+ renderDetail(a);}
+function maVal(arr,i,n){if(i+1<n)return null;let t=0;for(let k=i-n+1;k<=i;k++)t+=arr[k].c;return t/n;}
+function panChart(dir){if(!state)return;const s=getTarget(state.selected);if(!s||!s.candles.length)return;
+ const zoom=state.chartZoom||CFG.chartCandles;const maxOff=Math.max(0,s.candles.length-zoom);
+ state.chartOffset=clamp(state.chartOffset-dir*Math.max(1,Math.floor(zoom/3)),0,maxOff);mark('detail');}
+function zoomChart(dir){if(!state)return;state.chartZoom=clamp(state.chartZoom+dir*30,30,CFG.maxCandles);state.chartOffset=0;mark('detail');}
+function drawChart(){const s=getTarget(state.selected);if(!s)return;state.chartMode==='k'?drawK(s):drawFenshi(s);}
+function drawK(s){const{ctx,W,H}=fitCanvas($('chart'));
+ const zoom=state.chartZoom||CFG.chartCandles;
+ const arr=s.candles,N=Math.min(arr.length,zoom);if(!N)return;
+ const off=Math.min(state.chartOffset||0,Math.max(0,arr.length-N));
+ const st=arr.length-N-off;
+ const pR=58,pT=12,pB=8,pL=8,pw=W-pL-pR,ph=H-pT-pB;
+ let mn=1/0,mx=-1/0;
+ for(let i=st;i<st+N;i++){mn=Math.min(mn,arr[i].l);mx=Math.max(mx,arr[i].h);
+  [maVal(arr,i,5),maVal(arr,i,10)].forEach(v=>{if(v!=null){mn=Math.min(mn,v);mx=Math.max(mx,v);}});}
+ const pad=(mx-mn)*0.08||1;mn-=pad;mx+=pad;
+ const X=i=>pL+(i-st+0.5)*pw/N,Y=v=>pT+(1-(v-mn)/(mx-mn))*ph;
+ ctx.font='11px "Microsoft YaHei"';
+ for(let g=0;g<=4;g++){const v=mn+(mx-mn)*g/4,y=Y(v);
+  ctx.strokeStyle=PAL.grid;ctx.beginPath();ctx.moveTo(pL,y);ctx.lineTo(W-pR,y);ctx.stroke();
+  ctx.fillStyle=PAL.axis;ctx.fillText(v.toFixed(2),W-pR+6,y+3);}
+ const cw=pw/N,bw=Math.max(2,cw*0.62);
+ for(let i=st;i<st+N;i++){const c=arr[i],u=c.c>=c.o,x=X(i);
+  ctx.strokeStyle=ctx.fillStyle=u?PAL.up:PAL.dn;ctx.lineWidth=1;
+  ctx.beginPath();ctx.moveTo(x,Y(c.h));ctx.lineTo(x,Y(c.l));ctx.stroke();
+  const y1=Y(Math.max(c.o,c.c)),hh=Math.max(1.5,Y(Math.min(c.o,c.c))-y1);
+  if(u){ctx.fillStyle=PAL.hollow;ctx.fillRect(x-bw/2,y1,bw,hh);ctx.strokeRect(x-bw/2,y1,bw,hh);}
+  else ctx.fillRect(x-bw/2,y1,bw,hh);}
+ [[5,PAL.ma5],[10,PAL.ma10]].forEach(m=>{ctx.strokeStyle=m[1];ctx.lineWidth=1.2;ctx.beginPath();let started=false;
+  for(let i=st;i<st+N;i++){const v=maVal(arr,i,m[0]);if(v==null)continue;
+   started?ctx.lineTo(X(i),Y(v)):(ctx.moveTo(X(i),Y(v)),started=true);}ctx.stroke();});
+ if(HV.k!=null&&HV.k>=st&&HV.k<st+N){const c=arr[HV.k],x=X(HV.k),prev=HV.k>0?arr[HV.k-1].c:c.o,pc=(c.c/prev-1)*100;
+  ctx.strokeStyle=PAL.cross;ctx.setLineDash([3,3]);ctx.beginPath();ctx.moveTo(x,pT);ctx.lineTo(x,H-pB);ctx.stroke();ctx.setLineDash([]);
+  ctx.fillStyle=PAL.tipbg;ctx.strokeStyle=PAL.tipbd;
+  ctx.fillRect(pL+6,pT+4,178,54);ctx.strokeRect(pL+6,pT+4,178,54);
+  ctx.fillStyle=PAL.txt;
+  ctx.fillText('开 '+fmt2(c.o)+'  高 '+fmt2(c.h),pL+14,pT+18);
+  ctx.fillText('低 '+fmt2(c.l)+'  收 '+fmt2(c.c),pL+14,pT+33);
+  ctx.fillStyle=pc>=0?PAL.up:PAL.dn;ctx.fillText('涨跌 '+sgnPct(pc),pL+14,pT+48);}
+ if(s.listDay>0&&arr.length>1){
+  const cur=s.price;
+  const pctSince=(cur/arr[0].o-1)*100;
+  const pct90=arr.length>90?(cur/arr[arr.length-90].o-1)*100:null;
+  const pct30=arr.length>30?(cur/arr[arr.length-30].o-1)*100:null;
+  const pct7=arr.length>7?(cur/arr[arr.length-7].o-1)*100:null;
+  const sinceDay=state.day-s.listDay;
+  const lines=['上市 '+sinceDay+'天 '+sgnPct(pctSince)];
+  if(pct90!=null)lines.push('90天 '+sgnPct(pct90));
+  if(pct30!=null)lines.push('30天 '+sgnPct(pct30));
+  if(pct7!=null)lines.push('7天 '+sgnPct(pct7));
+  const bx=W-pR-90,by=pT+4,bw2=82,bh2=14*lines.length+8;
+  ctx.fillStyle='rgba(0,0,0,0.45)';ctx.fillRect(bx,by,bw2,bh2);
+  ctx.font='10px "Microsoft YaHei"';
+  lines.forEach((ln,i)=>{const neg=ln.indexOf('-')>4;
+   ctx.fillStyle=neg?PAL.dn:PAL.up;ctx.fillText(ln,bx+6,by+13+i*14);});}}
+function drawFenshi(s){const{ctx,W,H}=fitCanvas($('chart'));
+ const data=s.todaySeries,base=s.prevClose;if(data.length<2)return;
+ let dev=base*0.008;data.forEach(v=>dev=Math.max(dev,Math.abs(v-base)));
+ const mn=base-dev*1.2,mx=base+dev*1.2;
+ const X=i=>8+i/CFG.ticksPerDay*(W-70),Y=v=>10+(1-(v-mn)/(mx-mn))*(H-22);
+ ctx.font='11px "Microsoft YaHei"';
+ for(let g=0;g<=4;g++){const v=mn+(mx-mn)*g/4,y=Y(v),pc=(v/base-1)*100;
+  ctx.strokeStyle=PAL.grid;ctx.beginPath();ctx.moveTo(8,y);ctx.lineTo(W-62,y);ctx.stroke();
+  ctx.fillStyle=pc>=0?PAL.up:PAL.dn;ctx.fillText(sgnPct(pc),W-58,y+3);}
+ ctx.strokeStyle=PAL.base;ctx.setLineDash([4,4]);
+ ctx.beginPath();ctx.moveTo(8,Y(base));ctx.lineTo(W-62,Y(base));ctx.stroke();ctx.setLineDash([]);
+ ctx.beginPath();data.forEach((v,i)=>{i?ctx.lineTo(X(i),Y(v)):ctx.moveTo(X(0),Y(v));});
+ ctx.strokeStyle=PAL.line;ctx.lineWidth=1.5;ctx.stroke();
+ ctx.lineTo(X(data.length-1),Y(base));ctx.lineTo(X(0),Y(base));ctx.closePath();
+ ctx.fillStyle=data[data.length-1]>=base?PAL.fillUp:PAL.fillDn;ctx.fill();
+ if(HV.f!=null&&HV.f<data.length){const i=HV.f,v=data[i],pc=(v/base-1)*100,x=X(i);
+  ctx.strokeStyle=PAL.cross;ctx.setLineDash([3,3]);ctx.beginPath();ctx.moveTo(x,10);ctx.lineTo(x,H-12);ctx.stroke();ctx.setLineDash([]);
+  ctx.fillStyle='#fff';ctx.beginPath();ctx.arc(x,Y(v),3,0,7);ctx.fill();
+  ctx.fillStyle=PAL.tipbg;ctx.strokeStyle=PAL.tipbd;
+  ctx.fillRect(14,14,158,36);ctx.strokeRect(14,14,158,36);
+  ctx.fillStyle=PAL.txt;ctx.fillText(clockLabel(i)+'  '+fmt2(v),22,28);
+  ctx.fillStyle=pc>=0?PAL.up:PAL.dn;ctx.fillText('较昨收 '+sgnPct(pc),22,42);}}
+function renderActionBtns(){const box=$('actionBtns');
+ if(state.phase==='open'){box.innerHTML='<button class="btn-buy" onclick="doBuy()">买 入</button><button class="btn-sell" onclick="doSell()">卖 出</button>';}
+ else{box.innerHTML='<button class="btn-buy" onclick="preOrder(\'buy\')">挂预买单</button><button class="btn-sell" onclick="preOrder(\'sell\')">挂预卖单</button>';}}
+function refreshChips(){if(!state)return;const mode=(state.selected===GOLD_CODE)?'gold':'stock';if(mode!==chipsMode)buildChips();}
+function buildChips(){
+ const isGold=(state&&state.selected===GOLD_CODE);
+ chipsMode=isGold?'gold':'stock';
+ const bc=$('buyChips'),sc=$('sellChips');
+ bc.innerHTML='<span class="lb">买入</span>';sc.innerHTML='<span class="lb">卖出</span>';
+ if(isGold){
+  [[1,'1克'],[10,'10克'],[100,'100克'],[1000,'1000克']].forEach(cp=>{
+   const b=document.createElement('button');b.className='chip b';b.textContent=cp[1];
+   b.onclick=()=>{$('qtyInput').value=cp[0];updateTradePanel();};bc.appendChild(b);});
+  const bm=document.createElement('button');bm.className='chip b';bm.textContent='顶格';
+  bm.onclick=()=>{$('qtyInput').value=goldAfford();updateTradePanel();};bc.appendChild(bm);
+  [[1,'1克'],[10,'10克'],[100,'100克']].forEach(cp=>{
+   const b=document.createElement('button');b.className='chip s';b.textContent=cp[1];
+   b.onclick=()=>{$('qtyInput').value=cp[0];updateTradePanel();};sc.appendChild(b);});
+  const sm=document.createElement('button');sm.className='chip s';sm.textContent='全部';
+  sm.onclick=()=>{$('qtyInput').value=sellableQty();updateTradePanel();};sc.appendChild(sm);
+ }else{
+  [[0.25,'1/4'],[1/3,'1/3'],[0.5,'1/2'],[1,'全仓']].forEach(cp=>{
+   const b=document.createElement('button');b.className='chip b';b.textContent=cp[1];
+   b.onclick=()=>{const s=getStock(state.selected);if(!s)return;$('qtyInput').value=Math.floor(affordQty(s.price)*cp[0]/100)*100;updateTradePanel();};
+   bc.appendChild(b);});
+  [[1/3,'1/3'],[0.5,'1/2'],[1,'全部']].forEach(cp=>{
+   const b=document.createElement('button');b.className='chip s';b.textContent=cp[1];
+   b.onclick=()=>{$('qtyInput').value=Math.floor(sellableQty()*cp[0]/100)*100;updateTradePanel();};
+   sc.appendChild(b);});}}
+/* ★ 统一交易面板渲染（Asset 接口）：黄金显示点差/克数，股票显示佣金/股数 */
+function updateTradePanel(){
+ refreshChips();
+ const a=getTarget(state.selected);if(!a)return;
+ const isG=!!a.isGold,q=qtyVal();
+ const h=isG?state.gold:(state.holdings[a.code]||null);
+ const amt=q*(isG?gold.price:a.price);
+ const av=sellableQty(),lk=lockedSellQty(a.code),unit=isG?'克':'股';
+ $('qtyLabel').textContent=isG
+  ?'委托克数（最小 0.01 克 · 买入价 = 金价，卖出价 = 金价 − '+CFG.goldSpread+' 元）'
+  :'委托数量（1 手 = 100 股 · 本作 T+0 随时可卖）';
+ $('phaseNote').textContent=state.phase==='open'
+  ?(isG?'⏱ 盘中：按实时金价立即成交':'⏱ 盘中：按实时价立即成交')
+  :(isG?'🌙 非盘中：挂单进入预下单队列，开盘按开盘金价成交（跳空更大）':'🌙 非盘中：挂单进入预下单队列，开盘按开盘价成交（有跳空）');
+ let info='可用资金 <b class="mono" style="color:'+(state.cash<0?'var(--up)':'var(--tx)')+'">'+money(state.cash)+'</b> ｜ 可卖 <b class="mono" style="color:var(--tx)">'+av+' '+unit+'</b>';
+ if(lk>0)info+='<span class="dim">（另有 '+lk+' '+unit+'已挂预卖）</span>';
+ if(!isG){const fz=ipoFrozen();if(fz>0)info+='<br>🧊 冻结申购款 <b class="mono gold">'+money(fz)+'</b><span class="dim">（计入总资产，撤单可全额退回）</span>';}
+ if(state.cash<0)info+='<br><span class="up">⚠️ 现金为负（欠款状态），请卖出持仓回补</span>';
+ if(h)info+=' ｜ 成本 <b class="mono" style="color:var(--tx)">'+fmt2(h.cost)+'</b>'+(isG?'/克':'')+'<br>';
+ else info+='<br>';
+ if(isG){const sp=goldSellPrice();
+  info+='买入价 <b class="mono up">'+fmt2(gold.price)+'</b> ｜ 卖出价 <b class="mono dn">'+fmt2(sp)+'</b> ｜ 点差 <b class="mono gold">'+CFG.goldSpread.toFixed(2)+'</b> 元/克<br>';
+  info+='委托 '+q+' 克 ≈ <b class="mono" style="color:var(--gold)">'+money(amt)+'</b> ｜ 无佣金印花税，点差即全部成本<br>';
+  info+='按现价最多可买 <b class="mono up">'+goldAfford()+' 克</b> ｜ 逆大盘：股市弱则金价强';}
+ else{info+='委托 '+q+' 股 ≈ <b class="mono" style="color:var(--gold)">'+money(amt)+'</b> ｜ 佣金约 '+fmt2(buyFee(amt))+'，卖出另含印花税 '+fmt2(amt*CFG.stampTax)+'<br>';
+  info+='按现价最多可买 <b class="mono up">'+affordQty(a.price)+' 股</b>';
+  if(a.div)info+=' ｜ <span class="gold">💰 派息股：每 '+a.div.every+' 日每股 '+fmt2(a.div.per)+' 元</span>';}
+ $('tradeInfo').innerHTML=info;}
+function updateAssets(){
+ const frozen=ipoFrozen(),net=netWorth(),mv=net-state.cash-frozen,today=net-state.startOfDayNet;
+ state.maxNet=Math.max(state.maxNet||net,net);
+ $('aNet').textContent=money(net);
+ $('aCash').textContent=money(state.cash);
+ $('aCash').style.color=state.cash<0?'var(--up)':'var(--tx)';
+ $('aMv').textContent=money(mv);
+ const fw=$('aFrozenWrap');
+ if(frozen>0){fw.style.display='';$('aFrozen').textContent=money(frozen);}else{fw.style.display='none';}
+ const at=$('aToday');at.textContent=(today>=0?'+':'−')+fmt2(Math.abs(today));at.className='chiplet mono '+cls(today);
+ let ri=0;for(let i=0;i<RANKS.length;i++)if(net>=RANKS[i][0])ri=i;
+ const base=state.startCash||CFG.startCash;
+ const tr=net/base-1;
+ const goal=state.goal||CFG.winNet;
+ $('rankName').textContent='段位：'+RANKS[ri][1]+' ｜ 累计 '+sgnPct(tr*100)+' ｜ 距目标 '+Math.max(0,Math.round((1-net/goal)*100))+'%';
+ $('rankName').className=tr>=0?'gold':'dn';
+ const rb=regimeLabel();
+ $('regimeTip').innerHTML='<span style="color:'+rb[1]+';font-weight:700">'+rb[0]+'</span> <span style="opacity:.72">· 风向偏空时金价走强</span>';
+ if(!state.flags.cyb&&net>=CFG.cybUnlock){state.flags.cyb=1;buildWatchlist();
+   toast('🔓 总资产达到 50 万，「创业板」权限已开通！','achv');
+   pushNews('公告','good','创业板权限已开通：高波动新股向你敞开大门');}
+ $('cybTip').textContent=state.flags.cyb?'✅ 创业板权限已开通':'🔒 总资产达 '+money(CFG.cybUnlock)+' 解锁「创业板」（还差 '+money(Math.max(0,CFG.cybUnlock-net))+'）';
+ $('cybTip').className='gossip-tip'+(state.flags.cyb?' gold':' dim');
+ if(!state.flags.rumor&&net>=CFG.rumorUnlock){state.flags.rumor=1;$('tabRumor').style.display='';
+   toast('🔓 总资产达到 80 万，「小道消息」渠道已解锁！','achv');}
+ if(state.flags.rumor){$('tabRumor').style.display='';
+   $('gossipTip').textContent='🕵️ 小道消息渠道已开通（见右侧页签）';
+   $('btnRumor').disabled=state.cash<CFG.rumorCost;}
+ else{$('gossipTip').textContent='🔒 总资产达 '+money(CFG.rumorUnlock)+' 解锁「小道消息」';
+   $('gossipTip').className='gossip-tip dim';}
+ checkEnd(net);}
+function checkEnd(net){
+ const goal=state.goal||CFG.winNet;
+ if(!state.flags.god&&net>=goal){state.flags.god=1;showGod();}
+ if(!state.flags.dead&&!state.flags.dadDead&&net<1000&&ipoFrozen()<=0&&Object.keys(state.holdings).length===0&&!(state.gold&&state.gold.qty>0)){
+   state.flags.dead=1;state.paused=true;clearTimeout(timer);
+   $('btnPause').textContent='▶';mark('header','action');showDead();}}
+function phaseBtn(){const b=$('mainActionBtn'),h=$('mainHint');
+ if(state.flags.dead||state.flags.dadDead){b.disabled=true;b.textContent='💀 本局已结束';h.textContent='请点弹窗按钮重开';return;}
+ if(state.phase==='open'){
+   if(state.paused){b.disabled=false;b.textContent='▶ 继续交易';h.textContent='游戏已暂停';}
+   else{b.disabled=true;b.textContent='📈 盘中交易进行中…';h.textContent='每 3.75 秒推进一次行情，需要思考就点暂停';}}
+ else if(state.phase==='closed'){b.disabled=false;b.textContent='📅 进入下一交易日';h.textContent='可以先挂好预下单，再开盘';}
+ else{b.disabled=false;b.textContent='🔔 开始交易';h.textContent='首日开盘，祝好运';}}
+function renderHoldings(){const pane=$('paneHold');
+ const keys=Object.keys(state.holdings);const hasGold=state.gold&&state.gold.qty>0;
+ if(!keys.length&&!hasGold){pane.innerHTML='<div class="empty">暂无持仓</div>';return;}
+ let html='';let total=0;
+ if(hasGold){const sp=goldSellPrice(),pnl=(sp-state.gold.cost)*state.gold.qty,pct=(sp/state.gold.cost-1)*100;
+   total+=state.gold.qty*sp;
+   html+='<div class="hold-row au" onclick="selectStock(\''+GOLD_CODE+'\')"><div><div class="nm gold">🪙 传世之宝9999千足金</div><div class="qty mono">'+state.gold.qty+'克 · 成本'+fmt2(state.gold.cost)+'</div></div><div class="px mono">'+fmt2(sp)+'</div><div class="pnl mono '+cls(pnl)+'">'+(pnl>=0?'+':'')+fmt2(pnl)+'<br>'+sgnPct(pct)+'</div></div>';}
+ keys.forEach(c=>{const h=state.holdings[c],s=getStock(c);if(!s)return;
+   const pnl=(s.price-h.cost)*h.qty,pct=(s.price/h.cost-1)*100;total+=h.qty*s.price;
+   const dv=s.div?'<span class="divtag">息</span>':'';
+   html+='<div class="hold-row" onclick="selectStock(\''+c+'\')"><div><div class="nm">'+s.name+dv+'</div><div class="qty mono">'+h.qty+'股 · 成本'+fmt2(h.cost)+'</div></div><div class="px mono">'+fmt2(s.price)+'</div><div class="pnl mono '+cls(pnl)+'">'+(pnl>=0?'+':'')+fmt2(pnl)+'<br>'+sgnPct(pct)+'</div></div>';});
+ html+='<div style="padding:8px 12px;font-size:11px;color:var(--faint)">持仓市值合计 <span class="mono" style="color:var(--tx)">'+money(total)+'</span>'+(hasGold?'（黄金按卖出价计）':'')+'</div>';
+ pane.innerHTML=html;}
+function renderTrades(){const pane=$('paneTrade');
+ if(!state.trades.length){pane.innerHTML='<div class="empty">还没有成交记录</div>';return;}
+ pane.innerHTML=state.trades.slice(0,40).map(t=>'<div class="tr-row"><span class="tm mono">D'+t.day+' '+t.time+'</span><span class="'+(t.side==='buy'?'up':'dn')+'" style="font-weight:700">'+(t.side==='buy'?'买入':'卖出')+'</span><span>'+t.name+'</span><span class="mono" style="margin-left:auto">×'+t.qty+(t.unit||'股')+' @ '+fmt2(t.price)+'</span></div>').join('');}
+
+/* ================= toast / banner / modal ================= */
+function toast(msg,type){const t=document.createElement('div');t.className='toast '+(type||'ok');t.textContent=msg;
+ const box=$('toasts');box.appendChild(t);
+ while(box.children.length>5)box.firstChild.remove();
+ setTimeout(()=>{t.classList.add('out');setTimeout(()=>{if(t.parentNode)t.remove();},320);},3600);}
+function banner(txt){$('bannerText').textContent=txt;const b=$('dayBanner');
+ b.classList.remove('show');void b.offsetWidth;b.classList.add('show');}
+function modalOpen(){return !$('overlay').classList.contains('hidden');}
+let modalQueue=[];                     /* ★ 弹窗队列：同一天多个公告依次弹出，不再互相覆盖 */
+function paintModal(html,wide){
+ const mb=$('modalBox');
+ mb.classList.toggle('wide',!!wide);
+ mb.innerHTML=html;mb.scrollTop=0;
+ $('overlay').classList.remove('hidden');}
+function showModal(html,wide,replace){
+ if(state&&state.phase==='open'&&!state.paused&&!modalOpen()){
+   state.paused=true;clearTimeout(timer);$('btnPause').textContent='▶';modalResume=true;
+   mark('header','action');}
+ if(replace){modalQueue.length=0;paintModal(html,wide);return;}   /* 菜单导航：清队直显 */
+ if(modalOpen()){modalQueue.push({html:html,wide:!!wide});return;}
+ paintModal(html,wide);}
+function hideModal(){
+ if(modalQueue.length){const nx=modalQueue.shift();paintModal(nx.html,nx.wide);return;}
+ $('overlay').classList.add('hidden');
+ if(modalResume&&state){modalResume=false;
+   if(state.phase==='open'&&!state.flags.dead&&!state.flags.dadDead){state.paused=false;$('btnPause').textContent='⏸';schedule();}
+   mark('header','action');}}
+function drainModals(){modalQueue.length=0;$('overlay').classList.add('hidden');modalResume=false;}
+function resumeAfterModal(wasPaused){
+ if(!state)return;
+ if(modalOpen())return;              /* ★ 仍有排队弹窗时保持暂停，全部关完才恢复 */
+ if(state.flags.dead||state.flags.dadDead){state.paused=true;clearTimeout(timer);$('btnPause').textContent='▶';mark('header','action');return;}
+ state.paused=!!wasPaused;$('btnPause').textContent=state.paused?'▶':'⏸';
+ if(state.paused)clearTimeout(timer);else schedule();
+ mark('header','action');}
+
+/* ================= 关于 / 更新日志 ================= */
+function showAbout(){
+ showModal('<div class="about-logo">'+(APP_LOGO||'')+'</div>'+
+  '<div class="about-name">'+APP_NAME+'</div>'+
+  '<div class="about-ver">版本 '+APP_VERSION+'</div>'+
+  '<div class="about-cr">'+APP_COPYRIGHT+'<br><span class="about-rights">'+APP_RIGHTS+'</span></div>'+
+  (APP_EXTRA?'<div class="about-extra">'+APP_EXTRA+'</div>':'')+
+  '<div class="receipt" style="margin-top:16px">'+
+   '<div class="rl"><span>当前版本</span><b>'+APP_VERSION+'</b></div>'+
+   '<div class="rl"><span>作品名称</span><b>'+APP_NAME+'</b></div>'+
+   '<div class="rl"><span>版权</span><b>'+APP_COPYRIGHT+'</b></div>'+
+   '<div class="rl"><span>运行方式</span><b>纯本地离线 · 无需联网</b></div>'+
+   '<div class="rl"><span>存档位置</span><b>浏览器 localStorage</b></div></div>'+
+  '<p style="font-size:11px;color:var(--faint);text-align:center;line-height:1.8">本作为虚构娱乐作品，所有公司、代码、事件均为杜撰，<br>不构成任何投资建议。</p>'+
+  '<div class="mbtns">'+
+   '<button class="mbtn ghost" onclick="showChangelog()">📜 更新日志</button>'+
+   '<button class="mbtn pri" onclick="hideModal()">关闭</button></div>',false,true);}
+function showChangelog(){
+ const body=CHANGELOG.map((c,i)=>{
+   const items=(c.items||[]).map(x=>'<li>'+x+'</li>').join('');
+   return '<div class="cl-ver'+(i===0?' cur':'')+'">'+
+     '<div class="cl-vh">v'+c.v+(i===0?'<span class="curtag">当前版本</span>':'')+
+       (c.date?'<span class="cl-vd">'+c.date+'</span>':'')+'</div>'+
+     (c.title?'<div style="font-size:11px;color:var(--dim);margin-top:2px">'+c.title+'</div>':'')+
+     '<ul>'+items+'</ul></div>';}).join('');
+ showModal('<h2>📜 版本更新日志</h2><div class="msub">'+APP_NAME+' · 当前版本 '+APP_VERSION+'</div>'+
+  '<div class="cl-body">'+body+'</div>'+
+  '<p style="font-size:11px;color:var(--faint);text-align:center">'+APP_COPYRIGHT+' · '+APP_RIGHTS+'</p>'+
+  '<div class="mbtns">'+
+   '<button class="mbtn ghost" onclick="showAbout()">ℹ️ 关于本作</button>'+
+   '<button class="mbtn pri" onclick="hideModal()">关闭</button></div>',false,true);}
+
+function showIntro(){
+ const d=DIFFS[state.diff]||DIFFS.legacy;
+ const perkRules=(d.rules||[]).map(r=>'<li>'+r+'</li>').join('');
+ showModal('<h2>📋 账户开户回执</h2><div class="msub">欢迎莅临「韭菜证券」· '+d.icon+' '+d.name+'难度 · 无尽模式</div>'+
+ '<div class="receipt">'+
+ '<div class="rl"><span>难度</span><b>'+d.name+'（'+d.tag+'）</b></div>'+
+ '<div class="rl"><span>初始资金</span><b>'+money(state.startCash)+'</b></div>'+
+ '<div class="rl"><span>通关目标</span><b>'+money(state.goal)+'</b></div>'+
+ '<div class="rl"><span>交易规则</span><b>每手100股 · T+0 · 主板±'+Math.round(10*diffLimitMul())+'% / 创业板±'+Math.round(20*diffLimitMul())+'%</b></div>'+
+ '<div class="rl"><span>贵金属</span><b>千足金按克交易 · 点差 '+CFG.goldSpread+' 元 · 无涨跌停</b></div>'+
+ '<div class="rl"><span>市场生态</span><b>新股打新 · 派息股随机挂牌 · 问题股退市</b></div></div>'+
+ (perkRules?'<div class="ez-title" style="margin:2px 0 2px">🎭 本难度专属规则</div><ul style="margin:0 0 4px 18px">'+perkRules+'</ul>':'')+
+ '<ul><li>🔴 红涨绿跌；盘前/收盘后挂的预下单按次日开盘价成交</li>'+
+ '<li>📰 顶栏跑马灯滚动播报快讯；「大盘风向」告诉你现在是牛是熊</li>'+
+ '<li>📊 每天收盘弹出可拖动的「龙虎榜」，点名字直达该股</li>'+
+ '<li>💰 带「息」标记的是派息股，持有自动派现，且永不被退市</li>'+
+ '<li>🪙 左侧「贵金属」可买黄金避险：风向越空，金价越猛</li>'+
+ '<li>🧊 打新申购的钱是「冻结」而非「花掉」，全额计入总资产，不会因此破产；撤单可退回</li>'+
+ '<li>⚠️ 任何一只股票都可能突然被公告退市，随后连续一字跌停、到期只按 30% 清算，看到预警要果断</li>'+
+ '<li>🎉 打新：发行价 = 参考市价八折，上市首日以市价为锚开盘</li>'+
+ '<li>🚀 总资产达 50 万解锁创业板，80 万解锁小道消息</li>'+
+ '<li>👑 目标：总资产做到 '+money(state.goal)+'，封神收官</li></ul>'+
+ '<div class="mbtns"><button class="mbtn pri" onclick="hideModal();nextDayVeil()">🔔 进入第 1 个交易日</button></div>');}
+function tradeDetail(x){return '第 '+x.day+' 天 · '+x.name+'　成本 '+fmt2(x.cost)+' × '+x.qty+x.unit+' → 卖出 '+fmt2(x.price);}
+function perkSummary(){
+ if(!state.perks)return '';
+ const d=DIFFS[state.diff]||{};let out='';
+ [['A',d.perkA],['B',d.perkB]].forEach(pr=>{
+   const st=state.perks[pr[0]],cfg=pr[1];if(!st||!cfg)return;
+   if(cfg.type==='grant')out+='<div class="rl"><span>'+cfg.icon+' '+cfg.label+'</span><b>已领 '+st.paidCount+' 次 / '+money(st.paidCount*cfg.amount)+'</b></div>';
+   if(cfg.type==='bill')out+='<div class="rl"><span>'+cfg.icon+' '+cfg.label+'</span><b>已缴 '+st.paidCount+' 次 · 被强扣 '+st.forcedCount+' 次</b></div>';
+   if(cfg.type==='debt')out+='<div class="rl"><span>'+cfg.icon+' '+cfg.label+'</span><b>'+(st.retired?'已永久解除':'已转账 '+st.paidCount+' 次 / '+money(st.paidCount*cfg.amount))+'</b></div>';});
+ return out;}
+function showSettle(){const net=netWorth(),fz=ipoFrozen(),goal=state.goal||CFG.winNet;
+ let ri=0;for(let i=0;i<RANKS.length;i++)if(net>=RANKS[i][0])ri=i;
+ let tradeRows;
+ if(state.bestTrade){
+   if(state.worstTrade===state.bestTrade){
+     tradeRows='<div class="rl"><span>📊 已平仓交易</span><b class="'+cls(state.bestTrade.rate)+'">'+sgnPct(state.bestTrade.rate*100)+'</b></div>'+
+       '<div class="dtl">'+tradeDetail(state.bestTrade)+'</div>';
+   }else{
+     tradeRows='<div class="rl"><span>🏆 单笔最大盈利</span><b class="'+cls(state.bestTrade.rate)+'">'+sgnPct(state.bestTrade.rate*100)+'</b></div>'+
+       '<div class="dtl">'+tradeDetail(state.bestTrade)+'</div>'+
+       '<div class="rl"><span>💀 单笔最大亏损</span><b class="'+cls(state.worstTrade.rate)+'">'+sgnPct(state.worstTrade.rate*100)+'</b></div>'+
+       '<div class="dtl">'+tradeDetail(state.worstTrade)+'</div>';}}
+ else{tradeRows='<div class="rl"><span>单笔战绩</span><b>暂无已平仓交易</b></div>';}
+ const wasPaused=state.paused;
+ if(state.phase==='open'){state.paused=true;clearTimeout(timer);
+   $('btnPause').textContent='▶';mark('header','action');}
+ showModal('<h2>🧾 本局结算</h2><div class="msub">随时可以回来继续，或者换个姿势重来</div>'+
+ '<div class="receipt"><div class="rl"><span>难度</span><b>'+diffName(state.diff)+' · 无尽模式</b></div>'+
+ '<div class="rl"><span>交易天数</span><b>'+state.day+' 天</b></div>'+
+ '<div class="rl"><span>起始资金</span><b>'+money(state.startCash)+'</b></div>'+
+ '<div class="rl"><span>当前总资产</span><b>'+money(net)+'</b></div>'+
+ '<div class="rl"><span>通关目标</span><b>'+money(goal)+'（还差 '+money(Math.max(0,goal-net))+'）</b></div>'+
+ '<div class="rl"><span>其中持金</span><b>'+(state.gold&&state.gold.qty>0?state.gold.qty+' 克 / '+money(goldValue()):'无')+'</b></div>'+
+ '<div class="rl"><span>其中冻结申购款</span><b>'+(fz>0?money(fz):'无')+'</b></div>'+
+ '<div class="rl"><span>历史最高</span><b>'+money(state.maxNet)+'</b></div>'+
+ perkSummary()+tradeRows+
+ '<div class="rl"><span>成交笔数</span><b>'+state.trades.length+' 笔</b></div>'+
+ '<div class="rl"><span>江湖称号</span><b>'+RANKS[ri][1]+'</b></div></div>'+
+ '<div class="mbtns"><button class="mbtn ghost" onclick="hideModal();resumeAfterModal('+wasPaused+')">返回继续</button>'+
+ '<button class="mbtn pri" onclick="restart()">重开一把</button></div>');}
+function showGod(){if(state.phase==='open'){state.paused=true;clearTimeout(timer);
+  $('btnPause').textContent='▶';mark('header','action');}
+ const goal=state.goal||CFG.winNet;
+ const hasB=state.perks&&state.perks.B&&!state.perks.B.retired;
+ showModal('<h2>👑 '+money(goal)+' 达成 · 游戏通关！</h2>'+
+ '<div class="msub">'+diffName(state.diff)+'难度 · 从 '+money(state.startCash)+' 到 '+money(goal)+'，只用了 '+state.day+' 个交易日</div>'+
+ '<p style="margin:14px 0;font-size:13px;line-height:1.9;color:var(--dim)">营业部已经为你预留了大户室。</p>'+
+ (hasB?'<p style="margin:0 0 12px;font-size:12px;line-height:1.85;color:var(--dn)">🎁 通关特典：选择「继续玩下去」后，<b>爸爸喵的来电骚扰将永久解除</b>（房租仍需照常缴纳）。</p>':'')+
+ '<div class="mbtns"><button class="mbtn ghost" onclick="continueAfterWin()">继续玩下去</button>'+
+ '<button class="mbtn pri" onclick="restart()">重开一把</button></div>');}
+function continueAfterWin(){
+ if(state&&state.perks&&state.perks.B&&!state.perks.B.retired){
+   state.perks.B.retired=true;state.perks.B.dueDay=0;state.perks.B.nextDay=0;
+   toast('🎁 通关特典生效：爸爸喵的来电骚扰已永久解除','achv');
+   pushNews('家用','good','🎉 你已财务自由，爸爸喵的债务与你再无瓜葛，来电骚扰永久解除');}
+ mark('perks','assets','header','news');autoSave();
+ hideModal();resumeAfterModal(false);}
+function showDead(){showModal('<h2>💸 账户归零</h2><div class="msub">本金亏光，连手续费都交不起了……</div>'+
+ '<p style="margin:14px 0;font-size:13px;line-height:1.9;color:var(--dim)">你在<b class="gold">'+diffName(state.diff)+'难度</b>下坚持了 <b class="gold">'+state.day+'</b> 个交易日。<br>'+
+ '<span style="font-size:11.5px;color:var(--faint)">注：打新冻结的申购款已计入总资产，不会触发此判定。</span></p>'+
+ '<div class="mbtns"><button class="mbtn pri" onclick="restart()">重开一把</button></div>');}
+function confirmRestart(){showModal('<h2>↺ 重新开局？</h2><div class="msub">当前进度与存档将被清空，回到主界面重新选择模式与难度</div>'+
+ '<div class="mbtns"><button class="mbtn ghost" onclick="hideModal()">再想想</button>'+
+ '<button class="mbtn pri" onclick="restart()">清空重开</button></div>');}
+function restart(){LS.del(SAVEKEY);
+ $('tutBar').style.display='none';closeBoard();
+ newGame(lastDiff);drainModals();showMainMenu();}
+function newGame(diff){clearTimeout(timer);
+ diff=(diff&&DIFFS[diff])?diff:((state&&state.diff)?state.diff:'normal');
+ if(DIFF_ORDER.indexOf(diff)>=0)lastDiff=diff;
+ state=newState(diff);stocks=makeStocks();pool=makePool();ipoQtyVal=100;
+ if((DIFFS[diff]&&DIFFS[diff].limitMul)>1){const vm=DIFFS[diff].limitMul;
+   stocks.forEach(s=>{s.vol=+(s.vol*vm).toFixed(6);});
+   pool.forEach(p=>{p.vol=+(p.vol*vm).toFixed(6);});}   /* ★ 绝望档：波动与涨跌幅同步加倍 */
+ gold=newGold();presimAsset(gold);
+ stocks.forEach(presimAsset);
+ for(let i=0;i<CFG.preList&&pool.length;i++){const p=pool.find(x=>!x.listed&&!x.isDiv);if(p)listStock(p,true);}
+ state.events.push({type:'delist',code:'605098',announceDay:CFG.scriptDelistDay,execDay:CFG.scriptDelistDay+3,fixed:true});
+ state.indexOpen=calcIndex();
+ prevPx={};HV={k:null,f:null};chipsMode=null;modalResume=false;
+ buildWatchlist();renderPreList();renderRumors();
+ state.news=[];$('paneNews').innerHTML='';
+ const d=DIFFS[diff];
+ pushNews('公告','mkt','欢迎来到韭菜证券！'+d.icon+' '+d.name+'难度 · 起始 '+money(state.startCash)+' · 目标 '+money(state.goal));
+ selectStock(state.selected);renderActionBtns();syncCheat();invalidateAll();}
+
+/* ================= 控件绑定 ================= */
+$('btnPause').onclick=togglePause;
+document.querySelectorAll('#speedSeg [data-sp]').forEach(b=>b.onclick=()=>{
+ state.speed=+b.dataset.sp;document.querySelectorAll('#speedSeg [data-sp]').forEach(x=>x.classList.toggle('on',x===b));schedule();});
+document.querySelectorAll('#chartSeg button').forEach(b=>b.onclick=()=>{
+ state.chartMode=b.dataset.m;document.querySelectorAll('#chartSeg button').forEach(x=>x.classList.toggle('on',x===b));
+ HV.k=HV.f=null;drawChart();});
+document.querySelectorAll('.tabs-h button').forEach(b=>b.onclick=()=>{
+ document.querySelectorAll('.tabs-h button').forEach(x=>x.classList.toggle('on',x===b));
+ $('paneNews').classList.toggle('on',b.dataset.t==='news');
+ $('paneHold').classList.toggle('on',b.dataset.t==='hold');
+ $('paneTrade').classList.toggle('on',b.dataset.t==='trade');
+ $('paneRumor').classList.toggle('on',b.dataset.t==='rumor');});
+$('qtyInput').addEventListener('input',updateTradePanel);
+const chartEl=$('chart');
+chartEl.addEventListener('mousemove',e=>{const r=chartEl.getBoundingClientRect(),s=getTarget(state.selected);if(!s)return;
+ if(state.chartMode==='k'){const zoom=state.chartZoom||CFG.chartCandles;const N=Math.min(s.candles.length,zoom);
+  const off=Math.min(state.chartOffset||0,Math.max(0,s.candles.length-N));const st=s.candles.length-N-off;
+  const cw=(r.width-66)/N;HV.k=clamp(Math.floor((e.clientX-r.left-8)/cw)+st,st,st+N-1);}
+ else{HV.f=clamp(Math.round((e.clientX-r.left-8)/(r.width-70)*CFG.ticksPerDay),0,Math.min(s.todaySeries.length-1,CFG.ticksPerDay));}
+ drawChart();});
+chartEl.addEventListener('mouseleave',()=>{HV.k=HV.f=null;drawChart();});
+addEventListener('keydown',e=>{if(/INPUT|TEXTAREA/.test(e.target.tagName))return;
+ if(e.code==='Space'){e.preventDefault();togglePause();}
+ else if(e.key==='ArrowLeft'){e.preventDefault();panChart(-1);}
+ else if(e.key==='ArrowRight'){e.preventDefault();panChart(1);}});
+addEventListener('resize',()=>{if(state)drawChart();});
+addEventListener('beforeunload',()=>{if(state)autoSave();});
+makeDraggable($('boardPanel'),$('boardHead'));
+makeDraggable($('cheatPanel'),$('cheatHead'));
+
+/* ===== 作弊面板 ===== */
+document.addEventListener('keydown',e=>{
+ var panel=$('cheatPanel');var isOpen=panel.style.display==='block';
+ if(e.key==='F9'){e.preventDefault();
+   if(isOpen){panel.style.display='none';}else{panel.style.display='block';fillCheatStocks();updateCheatCount();}return;}
+ if(e.key==='Escape'&&isOpen){panel.style.display='none';}});
+function fillCheatStocks(){var sel=$('cheatStockSel');if(!sel)return;var keep=sel.value;
+ var html='<option value="'+GOLD_CODE+'">🪙 传世之宝9999千足金</option>';
+ for(var i=0;i<stocks.length;i++){html=html+'<option value="'+stocks[i].code+'">'+stocks[i].name+' ('+stocks[i].code+')</option>';}
+ sel.innerHTML=html;
+ if(keep){for(var j=0;j<sel.options.length;j++){if(sel.options[j].value===keep){sel.selectedIndex=j;break;}}}}
+function syncCheat(){const p=$('cheatPanel');
+ if(p&&p.style.display==='block'){fillCheatStocks();updateCheatCount();}}
+function updateCheatCount(){
+ $('cheatCapTxt').textContent=CFG.maxListed;
+ const live=liveCount(),pend=pendingListCount();
+ const divLeft=pool.filter(p=>p.isDiv&&!p.listed).length;
+ $('cheatCountTxt').textContent='当前在场：'+live+' / '+CFG.maxListed+' 只'+
+   (pend?'（另有 '+pend+' 只新股已占位）':'')+' ｜ 待上市派息股：'+divLeft+' 只 ｜ 难度：'+diffName(state.diff);}
+function cheatCash(amt){if(!amt||isNaN(amt))return;
+ state.cash=Math.max(-99999999,state.cash+amt);
+ toast('🔧 作弊：可用资金 '+(amt>0?'+':'')+fmt2(amt),amt>=0?'ok':'err');
+ updateAll();autoSave();}
+function cheatPrice(){var code=$('cheatStockSel').value;var price=parseFloat($('cheatPriceInput').value);
+ if(!code||isNaN(price)||price<=0)return toast('请输入有效价格','err');
+ var s=getTarget(code);if(!s)return;
+ s.price=+price.toFixed(2);
+ var c=s.candles[s.candles.length-1];
+ if(c){c.c=s.price;c.h=Math.max(c.h,s.price);c.l=Math.min(c.l,s.price);}
+ if(s.todaySeries.length)s.todaySeries[s.todaySeries.length-1]=s.price;
+ toast('🔧 作弊：'+s.name+' 价格 → '+fmt2(s.price),'achv');updateAll();autoSave();}
+function cheatPriceMul(mul){var code=$('cheatStockSel').value;
+ var s=getTarget(code);if(!s)return;
+ s.price=+(s.price*mul).toFixed(2);if(s.price<0.01)s.price=0.01;
+ var c=s.candles[s.candles.length-1];
+ if(c){c.c=s.price;c.h=Math.max(c.h,s.price);c.l=Math.min(c.l,s.price);}
+ if(s.todaySeries.length)s.todaySeries[s.todaySeries.length-1]=s.price;
+ toast('🔧 作弊：'+s.name+' ×'+mul+' → '+fmt2(s.price),'achv');updateAll();autoSave();}
+function cheatListStock(){
+ if(!state)return false;
+ if(!canAddStock()){
+   toast('在场已达上限 '+CFG.maxListed+' 只（当前 '+liveCount()+
+     (pendingListCount()?'，另有 '+pendingListCount()+' 只新股待上市已占位':'')+'）','err');
+   updateCheatCount();return false;}
+ const cand=pool.filter(p=>!p.listed&&!p.delisted&&!p.isDiv);
+ if(!cand.length){toast('候选池已空，无股可加','err');return false;}
+ const p=pick(cand);listStock(p,false);
+ toast('🔧 作弊：随机上市 '+p.name+'（'+liveCount()+'/'+CFG.maxListed+'）','achv');
+ updateCheatCount();return true;}
+function cheatListDiv(){
+ if(!state)return;
+ if(!canAddStock()){toast('在场已达上限 '+CFG.maxListed+' 只','err');updateCheatCount();return;}
+ const cand=pool.filter(p=>p.isDiv&&!p.listed&&!p.delisted);
+ if(!cand.length){toast('派息股已全部上市','err');updateCheatCount();return;}
+ listDivStock(pick(cand));updateCheatCount();}
+function cheatSkipDay(){
+ if(!state||state.phase!=='open'){toast('当前不在盘中，无法快进','err');return;}
+ closeDay();invalidateAll();toast('⏩ 已快进到当天闭市','achv');}
+/* 测试用：连续快进 N 天（默认 30），快速触发房租/来电等难度事件 */
+function cheatJumpDay(days){
+ if(!state){return;}
+ const n=Math.max(1,Math.floor(+days||30));
+ if(state.phase==='open')closeDay();
+ let guard=0;
+ while(guard<n&&!state.flags.dead&&!state.flags.dadDead){
+   guard++;
+   if(state.phase==='open')closeDay();
+   nextDay();
+   if(modalOpen())drainModals();
+   if(state.phase==='open')closeDay();}
+ clearTimeout(timer);
+ invalidateAll();
+ toast('⏩ 已快进 '+guard+' 天（第 '+state.day+' 日）','achv');
+ if(state.flags.dadDead)showDadDead();else if(state.flags.dead)showDead();   /* ★ 快进中死亡要让玩家看到结局 */}
+/* ===== ★ v023 新增作弊功能 ===== */
+function cheatGiveStock(){
+ if(!state)return;
+ if(state.selected===GOLD_CODE){
+   const h=state.gold||(state.gold={qty:0,cost:0});
+   h.cost=h.qty>0?(h.qty*h.cost+100*gold.price)/(h.qty+100):gold.price;
+   h.qty=r2(h.qty+100);
+   toast('🔧 作弊：黄金 +100 克（成本按现价计）','achv');}
+ else{
+   const s=getStock(state.selected);
+   if(!s)return toast('请先在左侧行情列表选中一只股票','err');
+   const h=state.holdings[s.code]||{qty:0,cost:0};
+   h.cost=(h.qty*h.cost+10000*s.price)/(h.qty+10000);h.qty+=10000;
+   state.holdings[s.code]=h;
+   toast('🔧 作弊：'+s.name+' +10000 股（成本按现价计）','achv');}
+ updateAll();autoSave();}
+function cheatLiquidate(){
+ if(!state)return;
+ let amt=0,n=0;
+ for(const c in state.holdings){const s=getStock(c);const h=state.holdings[c];
+   if(!s||!h||!(h.qty>0))continue;
+   const a=h.qty*s.price;amt+=a-sellFee(a);n++;}
+ state.holdings={};
+ if(state.gold&&state.gold.qty>0){amt+=state.gold.qty*goldSellPrice();state.gold=null;n++;}
+ if(!n)return toast('当前没有持仓','err');
+ state.cash+=amt;
+ toast('🔧 作弊：一键清仓 '+n+' 项，回笼 '+money(amt),'achv');
+ updateAll();autoSave();}
+function cheatForceDelist(){
+ if(!state)return;
+ const victims=stocks.filter(s=>s.listed&&!s.isBase&&!s.isDiv&&!s.delisted&&!inPanic(s)&&
+   (state.day-(s.listDay||0))>=CFG.minLifespan&&!state.events.some(e=>e.code===s.code));
+ if(!victims.length)return toast('没有符合条件的股票（需上市满 '+CFG.minLifespan+' 天的随机股）','err');
+ const v=pick(victims);
+ state.events.push({type:'delist',code:v.code,announceDay:state.day,execDay:state.day+3});
+ const e=state.events[state.events.length-1];e.announced=true;announceEvent(e);
+ toast('🔧 作弊：已排期 '+v.name+' 退市（3 日后执行）','achv');
+ updateAll();autoSave();}
+function cheatForceIPO(){
+ if(!state)return;
+ if(state.events.some(e=>e.type==='list'))return toast('已有进行中的新股申购','err');
+ if(!canAddStock())return toast('在场股票已达上限 '+CFG.maxListed+' 只','err');
+ const cand=pool.filter(p=>!p.listed&&!p.delisted&&!p.isDiv);
+ if(!cand.length)return toast('候选池已空，无股可发','err');
+ const p=pick(cand);presimAsset(p);
+ const ref=+p.price.toFixed(2);
+ const issue=Math.max(1,+(ref*0.8).toFixed(2));
+ state.events.push({type:'list',code:p.code,announceDay:state.day,execDay:state.day+2,
+                issuePrice:issue,refPrice:ref});
+ const e=state.events[state.events.length-1];e.announced=true;announceEvent(e);
+ toast('🔧 作弊：已排期 '+p.name+' 打新（2 日后上市）','achv');
+ updateAll();autoSave();}
+function cheatFreeRumor(){
+ if(!state)return;
+ const cand=stocks.filter(x=>!x.delisted&&x.listed&&!inPanic(x));
+ if(!cand.length)return toast('当前没有可打听的标的','err');
+ const r=rollRumor(pick(cand));
+ if(!state.flags.rumor)state.flags.rumor=1;             /* 顺带解锁页签，方便查看 */
+ mark('rumor','assets');
+ toast('🔧 作弊：免费消息（'+r.name+'），第 '+r.revealDay+' 日揭晓真伪','achv');autoSave();}
+function cheatRegime(v){
+ if(!state)return;
+ state.regime=clamp(+v||1,0.5,1.7);
+ toast('🔧 作弊：大盘情绪 → '+state.regime.toFixed(2)+'（'+regimeInfo().t+'）','achv');
+ mark('header','assets');autoSave();}
+function cheatUnlockAll(){
+ if(!state)return;
+ let did=false;
+ if(!state.flags.cyb){state.flags.cyb=1;did=true;}
+ if(!state.flags.rumor){state.flags.rumor=1;did=true;}
+ if(!did)return toast('早已全部解锁','err');
+ buildWatchlist();
+ toast('🔧 作弊：创业板 + 小道消息已解锁','achv');
+ invalidateAll();autoSave();}
+function cheatPerkDue(k){
+ if(!state||!state.perks||!state.perks[k])return toast('当前难度没有该事件槽','err');
+ const st=state.perks[k],cfg=perkCfg(k);
+ if(!cfg)return toast('当前难度没有该事件槽','err');
+ if(st.retired)return toast('该事件已了结','err');
+ if(cfg.type==='grant'){st.nextDay=state.day;}
+ else if(cfg.type==='bill'){st.dueDay=state.day;}
+ else{if(!st.revealed){st.revealed=true;revealDebt(cfg);}st.dueDay=state.day;}
+ mark('perks','news');
+ toast('🔧 作弊：'+cfg.label+' 已设为今日到期','achv');autoSave();}
+function cheatRetireDad(){
+ if(!state||!state.perks||!state.perks.B)return toast('当前难度没有爸爸来电事件','err');
+ state.perks.B.retired=true;state.perks.B.dueDay=0;state.perks.B.nextDay=0;
+ toast('🔧 作弊：爸爸喵的来电骚扰已永久解除','achv');
+ mark('perks');autoSave();}
+function cheatWin(){
+ if(!state)return;
+ state.flags.god=0;
+ checkEnd(state.goal||CFG.winNet);}
+function cheatDead(){
+ if(!state)return;
+ if(state.flags.dead||state.flags.dadDead)return toast('本局已结束','err');
+ state.flags.dead=1;state.paused=true;clearTimeout(timer);
+ $('btnPause').textContent='▶';
+ mark('header','action');showDead();autoSave();}
+function openTutorial(){
+ if(state&&state.tutorial){
+   showModal('<h2>🚪 退出新手教程？</h2><div class="msub">将结束教程，回到主界面选择难度</div>'+
+   '<div class="mbtns"><button class="mbtn ghost" onclick="hideModal()">继续教程</button>'+
+   '<button class="mbtn pri" onclick="exitTutorial()">退出并回主界面</button></div>',false,true);
+ }else{
+   showModal('<h2>🎓 进入新手教程</h2><div class="msub">教程是独立一局（10 万本金、无场外事件），结束后回到主界面</div>'+
+   '<div class="mbtns"><button class="mbtn ghost" onclick="hideModal()">再想想</button>'+
+   '<button class="mbtn pri" onclick="startTutorialFromButton()">开始教程</button></div>',false,true);}}
+function exitTutorial(){hideModal();clearTimeout(timer);LS.del(SAVEKEY);
+ $('tutBar').style.display='none';closeBoard();newGame(lastDiff);showMainMenu();}
+function startTutorialFromButton(){hideModal();clearTimeout(timer);LS.del(SAVEKEY);
+ closeBoard();showTutConcept();}
+
+/* ================= 启动 ================= */
+(function boot(){
+ buildDetailShell();buildChips();
+ const fv=$('footVer');if(fv)fv.textContent='v'+APP_VERSION+' · 更新日志';
+ const sb=$('sealBtn');if(sb)sb.title='关于本作 · v'+APP_VERSION;
+ const bc=$('btnChangelog');if(bc)bc.title='版本更新日志 · v'+APP_VERSION;
+ gold=newGold();presimAsset(gold);
+ const raw=LS.get(SAVEKEY);let loaded=false;
+ if(raw){try{const d=JSON.parse(raw);
+   if(d&&d.S&&Array.isArray(d.stocks)){normalizeLoaded(d);
+     applyTheme(d.theme||'dark');
+     buildWatchlist();renderPreList();chipsMode=null;
+     if(DIFF_ORDER.indexOf(state.diff)>=0)lastDiff=state.diff;
+     if(state.selected!==GOLD_CODE&&!getStock(state.selected)){const nx=stocks.find(x=>!(x.cyb&&!state.flags.cyb));if(nx)state.selected=nx.code;}
+     selectStock(state.selected);renderActionBtns();syncCheat();invalidateAll();
+     toast('已载入存档（第 '+state.day+' 天 · '+diffName(state.diff)+'难度）','ok');
+     if(state.phase==='open'&&!state.paused)schedule();loaded=true;}
+   else toast('本地存档已损坏，已为你新开一局','err');
+ }catch(e){loaded=false;toast('本地存档读取失败，已为你新开一局','err');}}
+ if(!loaded){applyTheme('dark');newGame(lastDiff);}
+ if(loaded&&state.flags.dadDead)showDadDead();         /* ★ 死亡存档直接弹结局（排队机制下不能先弹主菜单） */
+ else if(loaded&&state.flags.dead)showDead();
+ else showMainMenu();                              /* ★ 存活局始终先经过主界面 */
+})();
+</script>
+</body>
+</html>
