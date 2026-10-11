@@ -1,0 +1,27 @@
+/* ============================================================
+   style.css — 钓鱼达人 样式
+   ============================================================ */
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  background: #1a1a2e;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  height: 100vh;
+  overflow: hidden;
+}
+
+canvas {
+  image-rendering: auto;
+  cursor: pointer;
+
+  /* 保持 16:9，尽量填满视口 */
+  width: min(100vw, calc(100vh * 16 / 9));
+  height: min(100vh, calc(100vw * 9 / 16));
+}

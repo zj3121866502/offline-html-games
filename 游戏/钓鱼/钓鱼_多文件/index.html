@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>钓鱼达人</title>
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <canvas id="game"></canvas>
+
+  <!-- 作弊面板：指定鱼搏斗下拉框 -->
+  <select id="cheatFishSelect" style="display:none;position:absolute;z-index:999;
+    background:#1e1928;color:#e0d8c0;border:2px solid #e04040;border-radius:4px;
+    font-size:13px;padding:4px 8px;max-height:300px;outline:none;"></select>
+
+  <!-- 最先初始化画布，后续所有模块都能用 canvas / ctx -->
+  <script>
+    const canvas = document.getElementById('game');
+    const ctx    = canvas.getContext('2d');
+  </script>
+
+  <!-- JS 按依赖顺序加载（全部共享全局作用域） -->
+  <script src="js/data.js"></script>
+  <script src="js/state.js"></script>
+  <script src="js/draw.js"></script>
+  <script src="js/game.js"></script>
+  <script src="js/input.js"></script>
+  <script src="js/main.js"></script>
+</body>
+</html>

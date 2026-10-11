@@ -1,0 +1,2001 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="theme-color" id="metaTheme" content="#0a1017">
+<title>韭菜模拟器2 · 大逃杀</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🔪</text></svg>">
+<style>
+:root{color-scheme:dark;
+  --bg:#0a1017; --panel:#101a27; --panel2:#0d1622; --line:#223349;
+  --tx:#d9e4f2; --dim:#8ba3c0; --faint:#5b7290;
+  --up:#ff5252; --up2:#ff8a8a; --dn:#2bd48a; --dn2:#7de8bb;
+  --gold:#f5b942; --cyan:#5ad1ff;
+  --mastA:#0e1826; --mastB:#0b1320; --panelA:#121d2c; --panelB:#0e1723;
+  --inputbg:#0a121c; --chipbg:rgba(0,0,0,.25); --hover:rgba(255,255,255,.035);
+  --grpbg:rgba(245,185,66,.05);
+  --aubg:rgba(245,185,66,.09);
+}
+:root[data-theme="light"]{color-scheme:light;
+  --bg:#eef1f6; --panel:#ffffff; --panel2:#f5f7fb; --line:#d9e0ec;
+  --tx:#182430; --dim:#51637a; --faint:#8595a8;
+  --up:#e02e2e; --up2:#c22424; --dn:#0a9e5c; --dn2:#0a8a50;
+  --gold:#c98a10; --cyan:#0b7dc0;
+  --mastA:#ffffff; --mastB:#f2f5fa; --panelA:#ffffff; --panelB:#f7f9fc;
+  --inputbg:#f0f3f8; --chipbg:rgba(0,0,0,.04); --hover:rgba(0,0,0,.04);
+  --grpbg:rgba(200,140,20,.07);
+  --aubg:rgba(200,140,20,.10);
+}
+*{margin:0;padding:0;box-sizing:border-box;
+  font-family:"Microsoft YaHei","微软雅黑","PingFang SC","Hiragino Sans GB",sans-serif}
+html,body{background:var(--bg)}
+body{color:var(--tx);font-size:13px;overflow-x:hidden;min-height:100vh;transition:background .3s}
+#app{position:relative;z-index:1}
+.mono{font-variant-numeric:tabular-nums;letter-spacing:.3px}
+.up{color:var(--up)} .dn{color:var(--dn)} .gold{color:var(--gold)} .dim{color:var(--dim)}
+button{cursor:pointer;border:none;background:none;color:inherit;touch-action:manipulation;-webkit-tap-highlight-color:transparent}
+button:focus-visible,input:focus-visible,select:focus-visible,[tabindex]:focus-visible{outline:2px solid var(--gold);outline-offset:1px}
+input{outline:none}
+.masthead{display:flex;align-items:center;gap:20px;flex-wrap:wrap;
+  padding:10px 16px;border-bottom:1px solid var(--line);background:linear-gradient(180deg,var(--mastA),var(--mastB))}
+.seal{width:42px;height:42px;flex:none;display:grid;place-items:center;
+  font-weight:900;font-size:22px;color:#fff;background:linear-gradient(145deg,#e5484d,#9e2227);
+  border-radius:8px;border:2px solid rgba(255,255,255,.18);transform:rotate(-4deg);
+  cursor:pointer;transition:color .18s,border-color .18s,background .18s,transform .18s,filter .18s,opacity .18s,box-shadow .18s}
+.seal:hover{filter:brightness(1.16);transform:rotate(-4deg) scale(1.07)}
+.seal:active{transform:rotate(-4deg) scale(.97)}
+.brand h1{font-size:20px;font-weight:900;letter-spacing:1px;line-height:1.1}
+.brand .sub{font-size:10px;letter-spacing:3px;color:var(--gold);margin-top:3px}
+.mh-stats{display:flex;gap:22px;flex-wrap:wrap}
+.mh-stat .lb{font-size:10px;color:var(--faint);letter-spacing:2px;margin-bottom:2px}
+.mh-stat .vl{font-size:18px;font-weight:700}
+.mh-stat .sm{font-size:11px}
+.livedot{display:inline-block;width:7px;height:7px;border-radius:50%;background:var(--dn);margin-right:6px}
+.livedot.paused{background:var(--gold)}
+.livedot.closed{background:var(--faint)}
+.mh-right{margin-left:auto;display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.networth .lb{font-size:10px;color:var(--faint);letter-spacing:2px;text-align:right}
+.networth .vl{font-size:21px;font-weight:700;color:var(--gold)}
+.seg{display:flex;border:1px solid var(--line);border-radius:6px;overflow:hidden}
+.seg button{padding:6px 10px;font-size:12px;color:var(--dim);border-right:1px solid var(--line);transition:color .15s,border-color .15s,background .15s,transform .15s,filter .15s,opacity .15s,box-shadow .15s}
+.seg button:last-child{border-right:none}
+.seg button:hover{color:var(--tx);background:var(--hover)}
+.seg button.on{background:rgba(245,185,66,.15);color:var(--gold)}
+.tbtn{padding:6px 10px;border:1px solid var(--line);border-radius:6px;font-size:12px;color:var(--dim);transition:color .15s,border-color .15s,background .15s,transform .15s,filter .15s,opacity .15s,box-shadow .15s}
+.tbtn:hover{border-color:var(--gold);color:var(--gold)}
+.ticker{display:flex;align-items:stretch;height:28px;border-bottom:1px solid var(--line);
+  background:var(--panel2);overflow:hidden}
+.ticker-lb{flex:none;display:flex;align-items:center;padding:0 12px;font-size:10px;letter-spacing:2px;
+  color:var(--gold);background:var(--grpbg);border-right:1px solid var(--line);white-space:nowrap}
+.ticker-vp{position:relative;flex:1;overflow:hidden;
+  -webkit-mask-image:linear-gradient(90deg,transparent,#000 2%,#000 98%,transparent);
+  mask-image:linear-gradient(90deg,transparent,#000 2%,#000 98%,transparent)}
+.ticker-run{position:absolute;top:0;left:0;height:100%;display:flex;align-items:center;white-space:nowrap;will-change:transform}
+.ticker-run span{padding-right:40px;font-size:11.5px;color:var(--dim)}
+@keyframes tickMove{from{transform:translateX(0)}to{transform:translateX(-50%)}}
+.layout{display:grid;grid-template-columns:292px minmax(0,1fr) 332px;gap:12px;padding:12px;max-width:1680px;margin:0 auto}
+.panel{background:linear-gradient(180deg,var(--panelA),var(--panelB));border:1px solid var(--line);
+  border-radius:8px;overflow:hidden;display:flex;flex-direction:column}
+.p-head{display:flex;align-items:baseline;gap:8px;padding:10px 12px;border-bottom:1px solid var(--line)}
+.p-head::before{content:'';width:4px;height:12px;background:var(--gold);align-self:center;flex:none}
+.p-head .cn{font-weight:700;font-size:13px}
+.p-head .en{font-size:9px;letter-spacing:3px;color:var(--faint)}
+.p-head .rt{margin-left:auto;font-size:10px;color:var(--faint)}
+.market .list{overflow-y:auto;max-height:calc(100vh - 160px)}
+.grp-head{padding:6px 12px 4px;font-size:10px;letter-spacing:2px;color:var(--gold);
+  background:var(--grpbg);border-bottom:1px solid var(--line);position:sticky;top:0;z-index:2}
+.wl-row{display:grid;grid-template-columns:1fr 72px 74px;gap:6px;align-items:center;
+  padding:8px 10px;border-bottom:1px solid var(--line);cursor:pointer;
+  border-left:2px solid transparent;transition:color .15s,border-color .15s,background .15s,transform .15s,filter .15s,opacity .15s,box-shadow .15s}
+.wl-row:hover{background:var(--hover)}
+.wl-row.sel{background:rgba(245,185,66,.07);border-left-color:var(--gold)}
+.wl-nm{font-size:12.5px;font-weight:500;line-height:1.2}
+.wl-cd{font-size:10px;color:var(--faint)}
+.wl-px{font-size:13px;font-weight:700;text-align:right}
+.wl-chg{font-size:11px;text-align:right;padding:2px 4px;border-radius:4px}
+.wl-chg.up{background:rgba(255,82,82,.12)} .wl-chg.dn{background:rgba(43,212,138,.10)}
+.wl-chg.limit{font-weight:700;outline:1px solid currentColor}
+.d-top{display:flex;align-items:flex-start;gap:14px;padding:13px 14px 6px;flex-wrap:wrap}
+.d-name{font-size:20px;font-weight:900}
+.d-code{color:var(--faint);font-size:12px;margin-left:8px}
+.tag{font-size:10px;padding:2px 8px;border-radius:3px;border:1px solid var(--line);color:var(--dim);margin-left:6px}
+.d-price{margin-left:auto;text-align:right}
+.d-price .big{font-size:32px;font-weight:700;line-height:1}
+.d-price .chg{font-size:13px;margin-top:3px}
+.d-stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(88px,1fr));gap:1px;background:var(--line);
+  border-block:1px solid var(--line);margin-top:8px}
+.d-stat{background:var(--panel2);padding:6px 10px}
+.d-stat .k{font-size:10px;color:var(--faint)} .d-stat .v{font-size:12.5px;margin-top:2px}
+.chart-bar{display:flex;align-items:center;gap:8px;padding:9px 12px 0}
+#chart{width:100%;height:290px;display:block;cursor:crosshair}
+.ma-legend{font-size:10px;color:var(--faint);margin-left:auto;display:flex;gap:12px}
+.ma-legend i{display:inline-block;width:10px;height:2px;margin-right:4px;vertical-align:middle}
+.trade{padding:12px 14px;border-top:1px solid var(--line)}
+.phase-note{font-size:11px;padding:6px 10px;border-radius:5px;margin-bottom:10px;
+  background:rgba(245,185,66,.08);border:1px dashed rgba(245,185,66,.3);color:var(--gold)}
+.tlabel{font-size:11px;color:var(--dim);margin-bottom:6px}
+.qty-row{display:flex;gap:6px}
+.qbtn{width:36px;height:36px;border:1px solid var(--line);border-radius:6px;font-size:16px;color:var(--dim);transition:color .15s,border-color .15s,background .15s,transform .15s,filter .15s,opacity .15s,box-shadow .15s}
+.qbtn:hover{border-color:var(--gold);color:var(--gold)}
+#qtyInput{flex:1;background:var(--inputbg);border:1px solid var(--line);border-radius:6px;color:var(--tx);
+  font-size:16px;text-align:center;padding:7px;transition:color .15s,border-color .15s,background .15s,transform .15s,filter .15s,opacity .15s,box-shadow .15s}
+#qtyInput:focus{border-color:var(--gold)}
+.chips{display:flex;gap:6px;margin-top:8px;flex-wrap:wrap}
+.chips .lb{font-size:10px;color:var(--faint);align-self:center}
+.chip{font-size:11px;padding:3px 10px;border:1px solid var(--line);border-radius:20px;color:var(--dim);transition:color .15s,border-color .15s,background .15s,transform .15s,filter .15s,opacity .15s,box-shadow .15s}
+.chip:hover{transform:translateY(-1px)}
+.chip.b:hover{border-color:var(--up);color:var(--up)}
+.chip.s:hover{border-color:var(--dn);color:var(--dn)}
+.trade-info{font-size:11px;color:var(--dim);line-height:1.9;margin:10px 0;padding:8px 10px;
+  background:var(--chipbg);border-radius:6px}
+.trade-btns{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.btn-buy,.btn-sell{padding:11px;border-radius:6px;font-size:15px;font-weight:900;letter-spacing:6px;color:#fff;transition:color .15s,border-color .15s,background .15s,transform .15s,filter .15s,opacity .15s,box-shadow .15s}
+.btn-buy{background:linear-gradient(145deg,#ef5350,#b32b30)}
+.btn-sell{background:linear-gradient(145deg,#26c281,#128a56)}
+.btn-buy:hover,.btn-sell:hover{transform:translateY(-2px);filter:brightness(1.12)}
+#preBox{margin-top:10px}
+.pre-row{display:flex;gap:8px;align-items:center;font-size:11px;padding:5px 8px;border-bottom:1px solid var(--line)}
+.pre-row button{margin-left:auto;color:var(--faint);font-size:14px;padding:0 4px}
+.pre-row button:hover{color:var(--up)}
+.asset{padding:12px 14px;border-bottom:1px solid var(--line)}
+.asset .nw{font-size:26px;font-weight:700;color:var(--gold)}
+.asset .rows{display:flex;justify-content:space-between;font-size:11px;color:var(--dim);margin-top:6px;flex-wrap:wrap;gap:4px}
+.chiplet{font-size:11px;padding:1px 7px;border-radius:4px}
+.chiplet.up{background:rgba(255,82,82,.12)} .chiplet.dn{background:rgba(43,212,138,.12)}
+.rankline{margin-top:8px;font-size:11px}
+.regime-line{margin-top:5px;font-size:10.5px;color:var(--faint);text-align:center}
+.action-zone{padding:12px 14px;border-bottom:1px solid var(--line)}
+#mainActionBtn{width:100%;padding:13px;border-radius:7px;font-size:16px;font-weight:900;letter-spacing:4px;
+  color:#10151c;background:linear-gradient(145deg,#ffd45e,#e89b2d);transition:color .15s,border-color .15s,background .15s,transform .15s,filter .15s,opacity .15s,box-shadow .15s}
+#mainActionBtn:hover:not(:disabled){transform:translateY(-2px);filter:brightness(1.08)}
+#mainActionBtn:disabled{background:#26364c;color:var(--faint);cursor:default}
+.main-hint{font-size:10px;color:var(--faint);text-align:center;margin-top:6px}
+.tabs-h{display:flex;border-bottom:1px solid var(--line)}
+.tabs-h button{flex:1;padding:9px 2px;font-size:12px;color:var(--faint);border-bottom:2px solid transparent;transition:color .15s,border-color .15s,background .15s,transform .15s,filter .15s,opacity .15s,box-shadow .15s}
+.tabs-h button:hover{color:var(--tx)}
+.tabs-h button.on{color:var(--gold);border-bottom-color:var(--gold);font-weight:700}
+.pane{overflow-y:auto;height:336px;display:none}
+.pane.on{display:block}
+.news-it{padding:8px 12px;border-bottom:1px solid var(--line)}
+.news-it .tm{font-size:10px;color:var(--faint);margin-right:6px}
+.ntag{font-size:10px;padding:1px 6px;border-radius:3px;margin-right:6px;font-weight:700}
+.ntag.good{background:rgba(255,82,82,.15);color:var(--up2)}
+.ntag.bad{background:rgba(43,212,138,.15);color:var(--dn2)}
+.ntag.mkt{background:rgba(90,209,255,.13);color:var(--cyan)}
+.ntag.board{background:rgba(245,185,66,.16);color:var(--gold)}
+.ntag.fun{background:var(--chipbg);color:var(--dim)}
+.news-it .tx{font-size:12px;line-height:1.55}
+.hold-row{display:grid;grid-template-columns:1fr auto auto;gap:4px 10px;padding:8px 12px;border-bottom:1px solid var(--line);cursor:pointer}
+.hold-row:hover{background:var(--hover)}
+.hold-row .nm{font-size:12px;font-weight:500}
+.hold-row .qty{font-size:10px;color:var(--faint)}
+.hold-row .px{font-size:12px;text-align:right}
+.hold-row .pnl{font-size:12px;text-align:right;font-weight:700}
+.tr-row{display:flex;gap:8px;padding:6px 12px;border-bottom:1px solid var(--line);font-size:11px}
+.tr-row .tm{color:var(--faint)}
+.empty{padding:30px;text-align:center;color:var(--faint);font-size:12px}
+footer{display:flex;justify-content:center;gap:24px;padding:10px;font-size:11px;color:var(--faint);flex-wrap:wrap}
+footer .fver{cursor:pointer;color:var(--dim);border-bottom:1px dashed var(--line)}
+footer .fver:hover{color:var(--gold);border-bottom-color:var(--gold)}
+kbd{font-size:10px;border:1px solid var(--line);border-bottom-width:2px;border-radius:4px;padding:1px 6px;background:var(--panel2)}
+#toasts{position:fixed;top:100px;right:14px;z-index:50;display:flex;flex-direction:column;gap:8px}
+.toast{min-width:220px;max-width:320px;padding:10px 14px;border-radius:6px;font-size:12px;
+  background:var(--panel);border:1px solid var(--line);border-left:3px solid var(--cyan);animation:tIn .3s ease}
+.toast.ok{border-left-color:var(--dn)} .toast.err{border-left-color:var(--up)}
+.toast.achv{border-left-color:var(--gold)}
+.toast.out{opacity:0;transition:color .3s,border-color .3s,background .3s,transform .3s,filter .3s,opacity .3s,box-shadow .3s}
+@keyframes tIn{from{opacity:0;transform:translateX(30px)}to{opacity:1;transform:none}}
+#dayBanner{position:fixed;inset:0;display:grid;place-items:center;pointer-events:none;z-index:40;opacity:0}
+#dayBanner .in{font-size:42px;font-weight:900;letter-spacing:8px;color:var(--gold);text-shadow:0 0 40px rgba(245,185,66,.5)}
+#dayBanner.show{animation:banner 1.5s ease}
+@keyframes banner{0%{opacity:0;transform:scale(.9)}18%{opacity:1;transform:scale(1)}75%{opacity:1}100%{opacity:0}}
+#nightVeil{position:fixed;inset:0;background:#04070c;z-index:35;opacity:0;pointer-events:none;
+  transition:opacity .8s ease}
+#nightVeil.on{opacity:1;pointer-events:auto}
+#nightText{position:absolute;top:36%;left:50%;transform:translateX(-50%);white-space:nowrap;
+  color:var(--gold);font-size:19px;font-weight:700;letter-spacing:6px;opacity:0;
+  text-shadow:0 0 30px rgba(245,185,66,.55);transition:opacity .5s ease .25s}
+#nightVeil.on #nightText{opacity:1}
+#boardPanel{position:fixed;top:96px;right:22px;z-index:70;width:330px;display:none;
+  background:var(--panel);border:1px solid var(--gold);border-radius:10px;
+  box-shadow:0 10px 44px rgba(0,0,0,.5)}
+#boardPanel.show{display:block;animation:mIn .3s ease}
+.bp-head{display:flex;align-items:center;gap:8px;padding:9px 12px;cursor:move;user-select:none;
+  touch-action:none;
+  border-bottom:1px solid var(--line);background:var(--grpbg);border-radius:10px 10px 0 0}
+.bp-head .tt{font-size:12.5px;font-weight:900;color:var(--gold);letter-spacing:1px}
+.bp-head .hint{font-size:9px;color:var(--faint)}
+.bp-head .cl{margin-left:auto;font-size:17px;line-height:1;color:var(--faint);cursor:pointer;padding:0 2px}
+.bp-head .cl:hover{color:var(--up)}
+.bp-body{padding:6px 12px 12px;max-height:54vh;overflow-y:auto}
+.bp-sec{font-size:10px;letter-spacing:2px;margin:9px 0 3px;font-weight:700}
+.bp-row{display:grid;grid-template-columns:16px 1fr 66px;gap:6px;align-items:center;
+  padding:5px 4px;border-bottom:1px solid var(--line);font-size:12px}
+.bp-row:hover{background:var(--hover)}
+.bp-rk{color:var(--faint);font-weight:700;font-size:11px}
+.bp-nm{cursor:pointer;color:var(--cyan);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.bp-nm:hover{text-decoration:underline}
+.bp-chg{text-align:right;font-weight:700}
+.overlay{position:fixed;inset:0;background:rgba(5,9,14,.8);z-index:60;display:grid;place-items:center}
+.overlay.hidden{display:none}
+.modal{width:min(440px,92vw);background:var(--panel);border:1px solid var(--line);border-radius:10px;
+  padding:26px;animation:mIn .3s ease;max-height:92vh;overflow-y:auto;overscroll-behavior:contain}
+.modal.wide{width:min(660px,94vw)}
+@keyframes mIn{from{opacity:0;transform:translateY(24px) scale(.96)}to{opacity:1;transform:none}}
+.modal h2{font-size:20px;font-weight:900}
+.modal .msub{font-size:12px;color:var(--dim);margin-top:4px}
+.receipt{border:1px dashed rgba(245,185,66,.4);border-radius:6px;padding:14px;margin:14px 0;font-size:12px;line-height:2}
+.receipt .rl{display:flex;justify-content:space-between;gap:10px}
+.receipt .rl b{color:var(--gold);text-align:right}
+.receipt .dtl{font-size:10.5px;color:var(--faint);line-height:1.6;margin:-9px 0 9px;letter-spacing:0}
+.modal ul{margin:10px 0 4px 18px;font-size:12px;color:var(--dim);line-height:2}
+.mbtns{display:flex;gap:10px;margin-top:18px}
+.mbtn{flex:1;padding:11px;border-radius:6px;font-weight:700;font-size:14px;transition:color .15s,border-color .15s,background .15s,transform .15s,filter .15s,opacity .15s,box-shadow .15s;letter-spacing:2px}
+.mbtn.pri{background:linear-gradient(145deg,#ef5350,#b32b30);color:#fff}
+.mbtn.ghost{border:1px solid var(--line);color:var(--dim)}
+.mbtn:hover{transform:translateY(-2px);filter:brightness(1.1)}
+/* ---- ★ 主界面 / 难度选择 ---- */
+.mm-hero{text-align:center;margin-bottom:6px}
+.mm-hero .lg{font-size:38px;line-height:1}
+.mm-hero h2{font-size:24px;margin-top:6px;letter-spacing:2px}
+.mm-hero .sb{font-size:10.5px;color:var(--gold);letter-spacing:3px;margin-top:5px}
+.mm-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin:16px 0 4px}
+.mm-card{padding:16px 14px;border-radius:10px;border:1px solid var(--line);cursor:pointer;
+  background:linear-gradient(180deg,var(--panelA),var(--panelB));text-align:center;transition:color .18s,border-color .18s,background .18s,transform .18s,filter .18s,opacity .18s,box-shadow .18s}
+.mm-card:hover{transform:translateY(-3px);border-color:var(--gold);filter:brightness(1.08)}
+.mm-card .ic{font-size:30px;line-height:1}
+.mm-card .tt{font-size:15px;font-weight:900;margin-top:7px;letter-spacing:1px}
+.mm-card .ds{font-size:11px;color:var(--dim);line-height:1.75;margin-top:6px}
+/* ★ 二代新增：清退态 / 标记 / 难度卡 */
+.wl-row.dead{opacity:.42;filter:grayscale(.85)}
+.wl-row.dead .wl-nm{text-decoration:line-through}
+.brmark{margin-left:4px;font-size:9px}
+.mark-row{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin:8px 0}
+.mm-card .ds{min-height:66px}
+.mm-card .tg{display:inline-block;margin-top:10px;font-size:10px;padding:2px 9px;border-radius:20px;
+  border:1px solid var(--line);color:var(--faint)}
+.mm-card .tg.hot{border-color:rgba(43,212,138,.5);color:var(--dn);background:rgba(43,212,138,.1)}
+.mm-card.off{opacity:.66}
+@media(max-width:640px){.mm-grid{grid-template-columns:1fr}}
+/* ---- 关于 / 更新日志 弹窗 ---- */
+.about-logo{font-size:34px;text-align:center;margin:2px 0 6px}
+.about-name{font-size:16px;font-weight:900;text-align:center;letter-spacing:1px}
+.about-ver{font-size:11px;text-align:center;color:var(--gold);letter-spacing:2px;margin-top:3px}
+.about-cr{font-size:11.5px;text-align:center;color:var(--dim);line-height:2;margin-top:12px}
+.about-rights{font-size:11px;text-align:center;color:var(--faint);letter-spacing:1px}
+.about-extra{font-size:11px;color:var(--faint);text-align:center;margin-top:8px;line-height:1.7}
+.cl-body{max-height:52vh;overflow-y:auto;padding-right:4px;margin:12px 0 2px}
+.cl-ver{padding:8px 11px;margin-bottom:8px;border-left:3px solid var(--line);
+  background:var(--chipbg);border-radius:0 5px 5px 0}
+.cl-ver.cur{border-left-color:var(--gold);background:var(--grpbg)}
+.cl-vh{font-size:12.5px;font-weight:900;color:var(--gold)}
+.cl-vh .curtag{font-size:9px;font-weight:700;margin-left:6px;padding:1px 6px;border-radius:3px;
+  background:rgba(245,185,66,.18);border:1px solid rgba(245,185,66,.45);color:var(--gold);vertical-align:1px}
+.cl-vd{font-size:10px;color:var(--faint);margin-left:6px;font-weight:400}
+.cl-ver ul{margin:6px 0 0 16px;font-size:11.5px;color:var(--dim);line-height:1.85}
+::-webkit-scrollbar{width:8px}::-webkit-scrollbar-thumb{background:var(--line);border-radius:4px}
+@media(max-width:1200px){
+  .layout{grid-template-columns:248px minmax(0,1fr)}
+  .right{grid-column:1/-1;display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:12px;align-items:start}
+}
+@media(max-width:820px){.layout{grid-template-columns:1fr}.market .list{max-height:280px}
+}
+/* ---- ★ 作弊面板（剧情版重制） ---- */
+.cheat-panel{position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);
+  z-index:100;background:#1a1028;border:2px solid #8b5cf6;border-radius:12px;
+  padding:0 0 16px;min-width:392px;max-width:94vw;max-height:88vh;overflow-y:auto;
+  box-shadow:0 0 40px rgba(139,92,246,.35)}
+.cheat-panel h3{color:#c4b5fd;font-size:14px;padding:13px 18px;margin:0;cursor:move;user-select:none;
+  touch-action:none;
+  border-bottom:1px solid #4c1d95;background:rgba(139,92,246,.14);border-radius:10px 10px 0 0}
+.cheat-inner{padding:16px 18px 0}
+.cheat-section{margin-bottom:14px}
+.cheat-label{font-size:11px;color:#a78bfa;margin-bottom:6px}
+.cheat-row{display:flex;gap:6px;margin-bottom:6px;flex-wrap:wrap}
+.cheat-row button{padding:5px 10px;border-radius:4px;font-size:12px;background:#2d2050;border:1px solid #7c3aed;color:#ddd6fe;transition:color .15s,border-color .15s,background .15s,transform .15s,filter .15s,opacity .15s,box-shadow .15s}
+.cheat-row button:hover{background:#4c1d95}
+.cheat-row input,.cheat-row select{background:#12081f;border:1px solid #6d28d9;border-radius:4px;color:#e9d5ff;padding:5px 8px;font-size:12px}
+.cheat-row select{flex:1}
+.cheat-row input{width:90px}
+.cheat-flag{padding:3px 8px!important;font-size:11px!important}
+/* Story Mode Styles */
+.story-load-area{display:flex;flex-direction:column;gap:12px;margin:16px 0}
+.story-file-btn{display:flex;align-items:center;gap:12px;padding:12px 16px;background:var(--panel2);border:1px dashed var(--line);border-radius:8px;cursor:pointer;transition:color .2s,border-color .2s,background .2s,transform .2s,filter .2s,opacity .2s,box-shadow .2s}
+.story-file-btn:hover{border-color:var(--gold);background:var(--hover)}
+.story-file-btn.loaded{border-color:var(--dn);border-style:solid;background:rgba(43,212,138,.05)}
+.story-file-btn .ic{font-size:24px}
+.story-file-btn .info{flex:1;text-align:left}
+.story-file-btn .tt{font-size:13px;font-weight:600;margin-bottom:2px}
+.story-file-btn .ds{font-size:11px;color:var(--dim)}
+.story-file-btn .st{font-size:10px;color:var(--faint);margin-top:2px}
+.story-file-btn.loaded .st{color:var(--dn)}
+.story-char-panel{background:var(--panel2);border:1px solid var(--line);border-radius:8px;padding:12px;margin:12px 0}
+.story-char-header{display:flex;align-items:center;gap:12px;margin-bottom:12px;padding-bottom:12px;border-bottom:1px solid var(--line)}
+.story-char-avatar{width:48px;height:48px;border-radius:50%;background:linear-gradient(135deg,var(--gold),#e5484d);display:grid;place-items:center;font-size:24px}
+.story-char-info{flex:1}
+.story-char-name{font-size:16px;font-weight:700;margin-bottom:2px}
+.story-char-desc{font-size:11px;color:var(--dim)}
+.story-skills{display:flex;flex-direction:column;gap:8px}
+.story-skill{display:flex;align-items:center;gap:10px;padding:8px 12px;background:var(--inputbg);border:1px solid var(--line);border-radius:6px;cursor:pointer;transition:color .15s,border-color .15s,background .15s,transform .15s,filter .15s,opacity .15s,box-shadow .15s}
+.story-skill:hover:not(.disabled):not(.used){border-color:var(--gold);background:var(--hover)}
+.story-skill.disabled{opacity:.4;cursor:not-allowed}
+.story-skill.used{opacity:.3;cursor:not-allowed;background:rgba(0,0,0,.2)}
+.story-skill.ultimate{border-color:var(--gold);background:linear-gradient(90deg,var(--aubg),transparent)}
+.story-skill .sk-icon{font-size:20px;flex:none}
+.story-skill .sk-info{flex:1}
+.story-skill .sk-name{font-size:12px;font-weight:600;margin-bottom:1px}
+.story-skill .sk-desc{font-size:10px;color:var(--dim)}
+.story-skill .sk-cond{font-size:9px;color:var(--faint);margin-top:1px}
+.story-skill .sk-tag{font-size:9px;padding:2px 6px;border-radius:3px;background:var(--chipbg);color:var(--dim)}
+.story-skill.ultimate .sk-tag{background:rgba(245,185,66,.2);color:var(--gold)}
+.story-skill.used .sk-tag{background:rgba(255,82,82,.15);color:var(--up)}
+.story-dialogue{padding:0}
+#modalBox:has(.story-dialogue){width:100vw;max-width:100vw;min-width:100vw;background:transparent;border:none;border-radius:0;padding:0;max-height:none;overflow:visible}
+.story-dialogue-box{position:fixed;bottom:0;left:0;right:0;background:rgba(10,14,20,.96);border-top:2px solid var(--gold);padding:12px 24px 16px;z-index:101;max-height:45vh;overflow-y:auto}
+.story-dialogue-speaker{font-size:13px;font-weight:700;color:var(--gold);margin-bottom:4px}
+.story-dialogue-text{font-size:13px;line-height:1.7;color:var(--tx);margin-bottom:10px}
+.story-dialogue-choices{display:flex;flex-wrap:wrap;gap:6px}
+.story-choice-btn{padding:8px 16px;background:var(--inputbg);border:1px solid var(--line);border-radius:6px;text-align:left;font-size:12px;transition:color .15s,border-color .15s,background .15s,transform .15s,filter .15s,opacity .15s,box-shadow .15s;cursor:pointer;color:var(--tx)}
+.story-choice-btn:hover{border-color:var(--gold);background:var(--hover)}
+.story-progress{background:var(--panel2);border-bottom:1px solid var(--line);padding:8px 14px;font-size:11px}
+.story-progress .sp-title{font-weight:700;color:var(--gold);margin-bottom:4px}
+.story-progress .sp-scene{color:var(--dim)}
+.story-progress .sp-sub{color:var(--faint);margin-top:3px;font-size:10px}
+.story-progress .sp-crisis{color:var(--up);margin-top:4px;font-weight:700}
+@media(prefers-reduced-motion:reduce){
+  *,*::before,*::after{animation-duration:.01ms!important;animation-iteration-count:1!important;transition-duration:.01ms!important;scroll-behavior:auto!important}
+  .ticker-run{animation:none!important}
+}
+</style>
+</head>
+<body>
+<div id="app">
+<header class="masthead">
+  <div class="seal" id="sealBtn" role="button" tabindex="0" aria-label="关于本作" onclick="showAbout()" onkeydown="if(event.key==='Enter')this.click()" title="关于本作">逃</div>
+  <div class="brand"><h1>韭菜模拟器2</h1><div class="sub" id="brandSub">大逃杀 · 纯属虚构</div></div>
+  <div class="mh-stats">
+    <div class="mh-stat"><div class="lb">存活指数</div><div class="vl" id="mhIndex">--</div><div class="sm mono" id="mhIndexChg">--</div></div>
+    <div class="mh-stat"><div class="lb">大盘风向</div><div class="vl" id="mhRegime" style="font-size:15px">--</div><div class="sm mono dim" id="mhRegimeSub">--</div></div>
+    <div class="mh-stat"><div class="lb">交易日</div><div class="vl" id="mhDay">第1日</div><div class="sm mono dim" id="mhClock">盘前</div></div>
+    <div class="mh-stat"><div class="lb">状态</div><div class="vl" style="font-size:14px"><span class="livedot" id="liveDot"></span><span id="mhState">盘前</span></div><div class="sm dim">红涨 · 绿跌</div></div>
+  </div>
+  <div class="mh-right">
+    <div class="networth"><div class="lb">我的股票</div><div class="vl" id="mhNet" style="font-size:14px">--</div></div>
+    <div class="seg" id="speedSeg">
+      <button id="btnPause" title="暂停/继续" aria-label="暂停或继续">⏸</button>
+      <button data-sp="1" class="on">1×</button><button data-sp="2">2×</button>
+      <button data-sp="4">4×</button><button data-sp="16">16×</button>
+    </div>
+    <button class="tbtn" id="btnChangelog" onclick="showChangelog()" title="版本更新日志" aria-label="版本更新日志">📜</button>
+    <button class="tbtn" onclick="showMainMenu()" title="返回主菜单" aria-label="返回主菜单">🏠</button>
+    <button class="tbtn" onclick="reopenBoard()" title="查看最近异动提示" aria-label="查看最近异动提示">📉</button>
+    <button class="tbtn" id="btnTheme" onclick="toggleTheme()" title="切换主题" aria-label="切换明暗主题">☀️</button>
+    <button class="tbtn" onclick="exportSave()" title="导出存档" aria-label="导出存档">⬇</button>
+    <button class="tbtn" onclick="$('importFile').click()" title="导入存档" aria-label="导入存档">⬆</button>
+    <input type="file" id="importFile" accept=".txt,.json" style="display:none" onchange="importSave(this)">
+    <button class="tbtn" onclick="showRules()">📖 规则</button>
+    <button class="tbtn" onclick="confirmRestart()">↺ 重开</button>
+    
+  </div>
+</header>
+<div class="ticker" aria-hidden="true">
+  <div class="ticker-lb">📰 滚动快讯</div>
+  <div class="ticker-vp"><div class="ticker-run" id="tickerRun"><span>加载中…</span></div></div>
+</div>
+<main class="layout">
+  <section class="panel market" aria-label="行情报价">
+    <div class="p-head"><span class="cn">股市幸存者</span><span class="en">SURVIVORS</span><span class="rt" id="wlLimit">存活 30 / 清退 0</span></div>
+    <div class="list" id="wlList"></div>
+  </section>
+  <section class="panel detail" aria-label="个股详情与交易">
+    <div class="d-top">
+      <div><span class="d-name" id="dName">--</span><span class="d-code" id="dCode"></span><span class="tag" id="dSector"></span><span class="tag" id="dLimitTag" style="display:none"></span></div>
+      <div class="d-price"><div class="big" id="dPrice">--</div><div class="chg" id="dChg">--</div></div>
+    </div>
+    <div class="d-stats" id="dStats"></div>
+    <div class="chart-bar">
+      <div class="seg" id="chartSeg"><button data-m="k" class="on">日K</button><button data-m="line">分时</button></div>
+      <div class="ma-legend"><span><i style="background:var(--gold)"></i>MA5</span><span><i style="background:var(--cyan)"></i>MA10</span></div>
+    </div>
+    <canvas id="chart"></canvas>
+    <div class="trade">
+      <div class="phase-note" id="phaseNote"></div>
+      <div class="mark-row"><span class="tlabel" style="margin:0">🏷️ 标记预判：</span><button class="mbtn ghost" style="padding:4px 10px;font-size:11px" title="预判选中股会被清退" onclick="brMark(S.selected,'elim')">🔴 会清退</button><button class="mbtn ghost" style="padding:4px 10px;font-size:11px" title="对选中股存疑" onclick="brMark(S.selected,'q')">❓ 存疑</button><button class="mbtn ghost" style="padding:4px 10px;font-size:11px" title="预判选中股能存活" onclick="brMark(S.selected,'surv')">🟢 会存活</button><button class="mbtn ghost" style="padding:4px 10px;font-size:11px" title="清除选中股标记" onclick="brMark(S.selected,'clear')">✖ 清除</button></div>
+      <div class="trade-info" id="tradeInfo"></div>
+      <div class="trade-btns" id="actionBtns"></div>
+          </div>
+  </section>
+  <aside class="right" aria-label="账户与资讯">
+    <section class="panel">
+      <div class="p-head"><span class="cn">我的账户</span><span class="en">PORTFOLIO</span></div>
+      <div class="asset">
+        <div class="nw" id="aHeld">--</div>
+        <div class="rows">
+          <span>难度 <b id="aDiff" style="color:var(--tx)">--</b></span>
+          <span>存活 <b id="aAlive" style="color:var(--tx)">--</b></span>
+          
+          <span>交换券 <span class="chiplet" id="aCoupon">--</span></span>
+        </div>
+        <div class="rankline"><span id="rankName" class="gold">--</span></div>
+        <div class="regime-line" id="regimeTip">--</div>
+      </div>
+      <div class="action-zone">
+        <button id="mainActionBtn" onclick="mainAction()">🔔 开始交易</button>
+        <div class="main-hint" id="mainHint"></div>
+        
+        
+      </div>
+      <div class="story-progress" id="storyProgress" style="display:none"></div>
+    </section>
+    <section class="panel">
+      <div class="tabs-h">
+        <button data-t="news" class="on">市场快讯</button>
+        <button data-t="hold">我的股票</button>
+        <button data-t="trade">线索档案</button>
+      </div>
+      <div class="pane on" id="paneNews"></div>
+      <div class="pane" id="paneHold"><div class="empty">暂无持仓</div></div>
+      <div class="pane" id="paneTrade"><div class="empty">还没有线索</div></div>
+          </section>
+  </aside>
+</main>
+<footer>
+  <span><kbd>Space</kbd> 暂停/继续</span>
+  <span>🔪 大逃杀 · 孙割的股市</span>
+  <span>💡 每天清退一只股票 · 让你手里那只活到最后</span>
+  <span id="footGoal">🎯 目标：--</span>
+  <span class="fver" id="footVer" onclick="showChangelog()" title="点击查看更新日志">--</span>
+</footer>
+</div>
+<div id="toasts" role="status" aria-live="polite"></div>
+<div id="nightVeil"><div id="nightText"></div></div>
+<div id="dayBanner"><div class="in" id="bannerText"></div></div>
+<div id="boardPanel">
+  <div class="bp-head" id="boardHead">
+    <span class="tt" id="boardTitle">📉 收盘异动提示</span>
+    <span class="hint">可拖动</span>
+    <span class="cl" role="button" tabindex="0" aria-label="关闭异动提示" onclick="closeBoard()" onkeydown="if(event.key==='Enter')this.click()" title="关闭">×</span>
+  </div>
+  <div class="bp-body" id="boardBody"></div>
+</div>
+<div id="cheatPanel" class="cheat-panel" style="display:none">
+  <h3 id="cheatHead">🔧 作弊面板 · 大逃杀 · 拖动标题栏移动 · F9/Esc 关闭</h3>
+  <div class="cheat-inner">
+  <div class="cheat-section">
+    <div class="cheat-label">💀 强制清退（把某股排到下一个清退并推进一日）</div>
+    <div class="cheat-row">
+      <select id="cheatElimSel" aria-label="选择清退对象"></select>
+      <button onclick="cheatForceElim()">清退它</button>
+    </div>
+  </div>
+  <div class="cheat-section">
+    <div class="cheat-label">🕵️ 透视 / 🎟️ 道具 / 🔎 线索</div>
+    <div class="cheat-row">
+      <button onclick="cheatReveal()">透视幸存者名单</button>
+      <button onclick="cheatGiveCoupon()">交换券 +1</button>
+      <button onclick="cheatForceClue('normal')">注入普通线索</button>
+      <button onclick="cheatForceClue('important')">注入重要线索</button>
+    </div>
+  </div>
+  <div class="cheat-section">
+    <div class="cheat-label">📈 修改价格（氛围调试）</div>
+    <div class="cheat-row">
+      <select id="cheatStockSel" aria-label="选择股票"></select>
+      <input id="cheatPriceInput" type="number" placeholder="目标价" step="0.01" aria-label="目标价格" style="width:90px">
+      <button onclick="cheatPrice()">设置</button>
+    </div>
+    <div class="cheat-row">
+      <button onclick="cheatPriceMul(1.1)">×1.1</button><button onclick="cheatPriceMul(1.5)">×1.5</button>
+      <button onclick="cheatPriceMul(0.9)">×0.9</button><button onclick="cheatPriceMul(0.5)">×0.5</button>
+    </div>
+  </div>
+  <div class="cheat-section">
+    <div class="cheat-label">⏩ 时间</div>
+    <div class="cheat-row">
+      <button onclick="cheatSkipDay()">快进到当天闭市</button>
+      <button onclick="cheatJumpDay(1)">+1 天</button>
+      <button onclick="cheatJumpDay(5)">+5 天</button>
+      <button onclick="cheatGotoFinal()">直达最终日</button>
+    </div>
+  </div>
+  </div>
+</div>
+<div class="overlay hidden" id="overlay"><div class="modal" id="modalBox" role="dialog" aria-modal="true" aria-label="游戏对话框"></div></div>
+
+<script>
+/* ╔══════════════════════════════════════════════════════════════════════╗
+   ║  ★★★ 关于弹窗 · 版权信息 —— 自定义区（直接改下面几行字符串即可）★★★  ║
+   ╚══════════════════════════════════════════════════════════════════════╝ */
+const APP_LOGO   = '🔪';
+const APP_NAME   = '韭菜模拟器2：大逃杀';
+const APP_VERSION= '26092501tsv';                           // ← 版本号（二代·大逃杀）
+const APP_COPYRIGHT = 'copyright©2026 囤囤鼠';
+const APP_RIGHTS    = '版权所有 · 仿冒必究';
+const APP_EXTRA     = '';
+
+/* ╔══════════════════════════════════════════════════════════════════════╗
+   ║  ★★★ 版本更新日志 —— 新版本往数组【最前面】加一条 ★★★              ║
+   ╚══════════════════════════════════════════════════════════════════════╝ */
+const CHANGELOG=[
+ {v:'26092501tsv', date:'2026-09-25', title:'韭菜模拟器2 · 大逃杀', items:[
+   '全新独立续作：与一代《上海街之狼》无关，你是被「孙割」忽悠入市的一枚小韭菜',
+   '大逃杀机制：开局 30 只股票，每天随机清退一只，幸存者集合开局即定、清退顺序随机；你的唯一目标是「最后一天手里那只还活着」',
+   '三档难度：简单（幸存 8 只 / 局长 25 日）/ 困难（幸存 3 只 / 28 日）/ 绝望（幸存 1 只 / 30 日）',
+   '股票券与交换券：Day1 用股票券认购一只，此后定期刷新一张交换券（最多持有 1 张，没用会留着），可与存活股票交换；保护期前 3 天无清退',
+   '线索系统：孙割会递来便条——普通线索隐晦指向将被清退的股票、重要线索给出幸存者的类别特征、绝望难度掺入纯噪音废话线索；线索档案可随时回读、应验盖章',
+   '右键标记：可对任意股票预判「会被清退 / 存疑 / 存活」，结局结算命中率',
+   '无现金概念：股价照常跳动，胜负只看手里那只活没活到最后',
+   '线索量大幅上调（简单 12普通+6重要 / 困难 9+4 / 绝望 4+1+4废话），节奏加密为每天至每3天一条，不再纯靠猜',
+   '线索档案「✓已应验」现在标出应验的股票名与清退日——玩家可以反过来学会「哪类传闻=要死」',
+   '新增「风声」机制：被盯上的股票清退前 3 天可能持续走弱（约六成死股会露马脚，幸存者也会随机下跌），价格成为辅助推理线而非确证信号']},
+];
+
+/* ╔══════════════════════════════════════════════════════════════════╗
+   ║  ★★★★★  二代《大逃杀》数据层  ★★★★★                            ║
+   ║  机制：30 只股票，每天随机清退 1 只；幸存者集合开局即定、清退顺序  ║
+   ║  随机；玩家用「股票券」认购 1 只，目标是最后一天手里那只还活着。  ║
+   ║  无现金概念——股价照常跳动只为氛围与线索素材，不藏任何数值信号。    ║
+   ╚══════════════════════════════════════════════════════════════════╝ */
+
+/* 全局常量（调平衡只改这里） */
+const BR_CFG={
+  totalStocks:30,          // 股票总数
+  protectionDays:3,        // 保护期：Day1-3 无清退
+  couponEveryDays:4,       // 交换券刷新周期（每难度可覆盖；最多持有 1 张，没用会留着）
+  qtyPerCoupon:100,        // 每张股票券认购股数
+  firstClueDay:3,          // 首条线索日（保护期最后一天，剧本化教学）
+  sunRecommendDiesIn:5,    // 孙割 Day1 推荐股保证在前 N 只内清退（必死彩蛋）
+  /* ★ 风声（价格软信号）：临近清退的股票提前走弱，但只是概率性的——
+     prob=0.6 → 40% 的死股看起来完全正常（假阴性）；幸存者因随机游走本来也常下跌（假阳性）。
+     bias 每 tick −0.0005 ≈ −1.8%/日，3 日累计 −5.4%；对比日波动 σ≈1.9%（vol≈0.0032×√36），
+     即 −1.6σ：足以在跌幅榜上浮现、不足以确证。调强弱只改这三个数。 */
+  omen:{days:3,prob:0.6,bias:-0.0005},
+  abnormalCut:-0.035,      // ★ 异动提示阈值：近3日累计跌幅 ≤ -3.5% 且≥2日收跌才上榜（只从观测价格算，不读 omen）
+  /* 派生：最终日 = totalStocks − survivors + protectionDays
+     简单 30-8+3=25 / 困难 30-3+3=30 / 绝望 30-1+3=32 */
+};
+
+/* 三难度：工具公平（券规则同），难度差全压在情报质量上 */
+const BR_DIFFICULTY={
+  easy:{name:'简单',icon:'🟢',survivors:8,
+        clueEveryDays:1,cluePlan:{normal:12,important:6,noise:0},couponEveryDays:3,
+        desc:'幸存 8 只 · 局长 25 日<br>每天都有便条（12 普通 + 6 重要），盲选基准胜率 8/30≈27%'},
+  hard:{name:'困难',icon:'🟠',survivors:3,
+        clueEveryDays:2,cluePlan:{normal:9,important:4,noise:0},couponEveryDays:3,
+        desc:'幸存 3 只 · 局长 30 日<br>每 2 天一条（9 普通 + 4 重要），盲选 3/30=10%'},
+  despair:{name:'绝望',icon:'🔴',survivors:1,
+        clueEveryDays:3,cluePlan:{normal:4,important:1,noise:4},couponEveryDays:4,
+        desc:'幸存 1 只 · 局长 32 日<br>每 3 天一条，9 条里掺 4 条纯噪音废话，盲选 1/30≈3%'},
+};
+
+/* 30 只股票（10 板块 · 无尽模式恶搞画风 · 名称待用户审阅可替换）
+   ★ drift 全置 0：价格纯随机游走，确保「不藏信号」——清退与价格无隐性关联
+   ★ 每只埋了线索钩子（数字/方位/天气/动物/职业…）供 P3 属性线索解谜 */
+const BR_STOCKS=[
+  /* 餐饮 4 */
+  {code:'600001',name:'辣爷酱料',  sector:'餐饮',start:18.50,drift:0,vol:0.0030},
+  {code:'600002',name:'雪王冰饮',  sector:'餐饮',start:6.60, drift:0,vol:0.0034},
+  {code:'600003',name:'康帅傅面馆',sector:'餐饮',start:9.90, drift:0,vol:0.0026},
+  {code:'600004',name:'七颗核桃',  sector:'餐饮',start:25.00,drift:0,vol:0.0032},
+  /* 消费 4 */
+  {code:'600011',name:'拼夕夕',    sector:'消费',start:3.70, drift:0,vol:0.0036},
+  {code:'600012',name:'十元小铺',  sector:'消费',start:10.00,drift:0,vol:0.0028},
+  {code:'600013',name:'爱宠之家',  sector:'消费',start:14.20,drift:0,vol:0.0030},
+  {code:'600014',name:'网红零食',  sector:'消费',start:8.80, drift:0,vol:0.0038},
+  /* 金融 4 */
+  {code:'601001',name:'缅北钱庄',  sector:'金融',start:5.50, drift:0,vol:0.0040},
+  {code:'601002',name:'割韭证券',  sector:'金融',start:12.00,drift:0,vol:0.0032},
+  {code:'601003',name:'稳赚保险',  sector:'金融',start:22.00,drift:0,vol:0.0022},
+  {code:'601004',name:'恒太地产',  sector:'金融',start:2.80, drift:0,vol:0.0042},
+  /* 科技 3 */
+  {code:'688001',name:'芯想事成',  sector:'科技',start:38.00,drift:0,vol:0.0036},
+  {code:'688002',name:'量子波动',  sector:'科技',start:16.80,drift:0,vol:0.0040},
+  {code:'688003',name:'元宇宙互娱',sector:'科技',start:7.70, drift:0,vol:0.0034},
+  /* 医药 3 */
+  {code:'600276',name:'长生堂',    sector:'医药',start:28.00,drift:0,vol:0.0024},
+  {code:'600196',name:'枸杞养生',  sector:'医药',start:11.10,drift:0,vol:0.0026},
+  {code:'603259',name:'仁心大药房',sector:'医药',start:19.90,drift:0,vol:0.0028},
+  /* 能源 3 */
+  {code:'601857',name:'黑金挖挖',  sector:'能源',start:9.00, drift:0,vol:0.0026},
+  {code:'600438',name:'光伏大侠',  sector:'能源',start:15.60,drift:0,vol:0.0034},
+  {code:'600900',name:'峡谷水电',  sector:'能源',start:21.00,drift:0,vol:0.0020},
+  /* 娱乐 3 */
+  {code:'603444',name:'选秀工厂',  sector:'娱乐',start:13.30,drift:0,vol:0.0038},
+  {code:'600037',name:'狗仔头条',  sector:'娱乐',start:6.00, drift:0,vol:0.0036},
+  {code:'300888',name:'雷霆游戏网',sector:'娱乐',start:33.00,drift:0,vol:0.0040},
+  /* 服务 2 */
+  {code:'300999',name:'顺风镖局',  sector:'服务',start:17.00,drift:0,vol:0.0030},
+  {code:'301088',name:'万事到家',  sector:'服务',start:8.00, drift:0,vol:0.0028},
+  /* 航天 2 */
+  {code:'688100',name:'飞船旅游',  sector:'航天',start:42.00,drift:0,vol:0.0042},
+  {code:'688101',name:'星际挖矿',  sector:'航天',start:26.60,drift:0,vol:0.0038},
+  /* 军工 2 */
+  {code:'600760',name:'北方大炮',  sector:'军工',start:30.00,drift:0,vol:0.0032},
+  {code:'600685',name:'航母大酒店',sector:'军工',start:20.20,drift:0,vol:0.0030},
+];
+
+
+
+
+
+
+
+/* ╔══════════════════════════════════════════════════════════════════╗
+   ║  ★★★★★  二代《大逃杀》核心引擎  ★★★★★                          ║
+   ║  无现金 · 单持仓 · 每日清退 · 券与线索 · 幸存者集合开局即定        ║
+   ╚══════════════════════════════════════════════════════════════════╝ */
+const BR_SAVEKEY='jiucai_save_br2_v1';   /* ★ 二代独立存档键（file:// 同源，勿与一代共用） */
+
+/* 孙割语录池 */
+const SUN_QUOTES_DELIST=[
+  '孙割叼着雪茄宣布：「{name}」退市了——韭菜们，节哀。',
+  '孙割笑眯眯地划掉「{name}」：「又割了一茬，舒服。」',
+  '「{name}」被强制清退。孙割：「下一个是谁呢？哦，可能是你。」',
+  '大屏幕暗了一格——「{name}」没了。孙割在角落鼓掌。',
+  '孙割：「『{name}』的故事到此为止。别哭，股市不相信眼泪。」'];
+
+/* ★ 合成 80 天K线历史，整条等比缩放使最新收盘=起始价（自一代移植，保证 day1 价格=剧本价） */
+function presimToStart(s){
+ presim(s);
+ const last=s.candles[s.candles.length-1];
+ if(last&&last.c>0){
+  const k=s.start/last.c;
+  s.candles.forEach(c=>{c.o=+(c.o*k).toFixed(2);c.h=+(c.h*k).toFixed(2);c.l=+(c.l*k).toFixed(2);c.c=+(c.c*k).toFixed(2);});
+ }
+ s.price=s.start;s.prevClose=s.start;s.open=s.start;s.high=s.start;s.low=s.start;
+ s.todaySeries=[s.start];}
+
+/* 标记图标 */
+function markIcon(m){return m==='elim'?'🔴':(m==='surv'?'🟢':(m==='q'?'❓':''));}
+
+/* ---- 难度/状态访问器 ---- */
+function brDiff(){return BR_DIFFICULTY[S&&S.diff]||BR_DIFFICULTY.easy;}
+function brFinalDay(){return BR_CFG.totalStocks-brDiff().survivors+BR_CFG.protectionDays;}
+function brAliveStocks(){return (typeof stocks!=='undefined'&&stocks)?stocks.filter(s=>!s.eliminated):[];}
+function brIsSurvivor(code){return !!(S.br&&S.br.survivors.indexOf(code)>=0);}
+function brIsEliminated(code){return !!(S.br&&S.br.eliminated.some(e=>e.code===code));}
+
+/* Fisher-Yates 洗牌（用 Math.random，fuzz 可种子化） */
+function brShuffle(arr){const a=arr.slice();
+ for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));const t=a[i];a[i]=a[j];a[j]=t;}
+ return a;}
+
+/* ★ 开局发牌：定死幸存者集合 + 随机清退顺序 + 孙割推荐股（保证前 N 清退） */
+function brDeal(){
+ const codes=BR_STOCKS.map(s=>s.code);
+ const shuffled=brShuffle(codes);
+ const nSurv=brDiff().survivors;
+ const survivors=shuffled.slice(0,nSurv);          // 幸存者：永不清退
+ let elimPool=brShuffle(shuffled.slice(nSurv));    // 清退池，顺序随机
+ const dieSoon=elimPool.slice(0,BR_CFG.sunRecommendDiesIn);
+ S.br.survivors=survivors;
+ S.br.elimOrder=elimPool;
+ S.br.eliminated=[];
+ S.br.sunRecommend=dieSoon.length?pick(dieSoon):elimPool[0];
+ S.br.finalDay=brFinalDay();
+ /* ★ 风声：死股 elimOrder[i] 在第 (protectionDays+1+i) 日被清退；其中 omen.prob 概率
+    提前 omen.days 天开始走弱（软信号，非全部死股都异动 → 保留不确定性） */
+ S.br.omen={};
+ elimPool.forEach((code,i)=>{
+  const dieDay=BR_CFG.protectionDays+1+i;
+  if(Math.random()<BR_CFG.omen.prob)
+   S.br.omen[code]={dieDay:dieDay,from:Math.max(1,dieDay-BR_CFG.omen.days)};});}
+
+/* 当日是否处于某只风声股的走弱窗口（brOpenDay 每早据此设 bias） */
+function brOmenBias(code,day){
+ const o=S.br&&S.br.omen&&S.br.omen[code];
+ if(!o)return 0;
+ return (day>=o.from&&day<o.dieDay)?BR_CFG.omen.bias:0;}
+
+/* ★ 建股票池（30 只，合成历史K线锚定起始价；带 eliminated/mark 字段） */
+function brBuildStocks(){
+ stocks=BR_STOCKS.map(d=>({...d,limit:999,price:d.start,prevClose:d.start,
+  open:d.start,high:d.start,low:d.start,bias:0,biasTicks:0,todaySeries:[d.start],candles:[],
+  limitState:0,limitNews:false,delisted:false,listed:true,listDay:0,alertDay:0,
+  eliminated:false,elimDay:0,mark:null,rets:[]}));
+ stocks.forEach(presimToStart);}
+
+/* ★ 开始一局大逃杀 */
+function startBrGame(diff){
+ hideModal();drainModals();
+ LS.del(BR_SAVEKEY);
+ clearTimeout(timer);
+ S=newState();
+ S.diff=BR_DIFFICULTY[diff]?diff:'easy';S.mode='br2';
+ S.br={survivors:[],elimOrder:[],eliminated:[],holding:null,coupons:0,
+   clueLog:[],clueUsed:{normal:0,important:0,noise:0},marks:{},omen:{},
+   sunRecommend:null,finalDay:0,subscribed:false,won:false,elimCount:0};
+ prevPx={};HV={k:null,f:null};modalResume=false;
+ brBuildStocks();
+ brDeal();
+ S.day=1;S.phase='pre';S.tick=0;
+ S.indexOpen=calcIndex();S.indexLevel=1000;
+ buildWatchlist();
+ selectStock(stocks[0].code);
+ pushNews('公告','mkt','🔪 大逃杀开始！'+brDiff().name+'难度 · '+stocks.length+' 只股票 · 幸存 '+brDiff().survivors+' 只 · 局长 '+S.br.finalDay+' 日');
+ pushNews('公告','fun','💡 用「股票券」认购一只股票，目标是让它活到最后一天。前 '+BR_CFG.protectionDays+' 天保护期无清退。');
+ renderActionBtns();invalidateAll();
+ showSubscribeHint();
+ autoSave();}
+
+/* Day1 认购提示弹窗（孙割推荐 = 必死彩蛋） */
+function showSubscribeHint(){
+ const rec=getStock(S.br.sunRecommend);
+ showModal('<h2>🔪 大逃杀 · '+brDiff().name+'</h2>'+
+  '<div class="msub">'+stocks.length+' 只股票 · 每天清退一只 · 活到最后就赢</div>'+
+  '<p style="margin:14px 0;font-size:13px;line-height:1.9;color:var(--dim)">你是一枚刚入市的小韭菜。一个叫<b style="color:var(--gold)">「孙割」</b>的人凑过来，神秘兮兮地推荐了一只股票：<br><br>'+
+  '<span style="font-size:15px;color:var(--cyan);font-weight:700">「'+(rec?rec.name:'')+'」——「听我的，买它，稳赚。」</span><br><br>'+
+  '你手里有一张<b style="color:var(--gold)">股票券</b>，可以认购任意一只股票的 '+BR_CFG.qtyPerCoupon+' 股。<br>在左侧行情栏点选一只，然后点「认购」。<br><span style="color:var(--faint);font-size:11px">（孙割的话……你信吗？）</span></p>'+
+  '<div class="mbtns"><button class="mbtn ghost" onclick="selectStock(S.br.sunRecommend);hideModal();dayOneSubscribe()">就听孙割的</button>'+
+  '<button class="mbtn pri" onclick="hideModal()">我自己挑</button></div>',false,true);}
+
+/* ★ 用股票券认购选中股（仅 Day1） */
+function dayOneSubscribe(){
+ if(!S.br||S.br.subscribed)return toast('已经认购过了','err');
+ const code=S.selected;const s=getStock(code);
+ if(!s)return toast('请先在左侧选中一只股票','err');
+ if(s.eliminated)return toast('这只已经被清退了','err');
+ S.br.holding=code;S.br.subscribed=true;
+ pushNews('认购','good','🎫 你用股票券认购了「'+s.name+'」'+BR_CFG.qtyPerCoupon+' 股。命运绑定，大逃杀开始。');
+ toast('🎫 已认购「'+s.name+'」','ok');
+ hideModal();
+ brOpenDay();}
+
+/* ★ 每日审判：清退一只（保护期后）。命中持仓返回 {hit:true} */
+function dailyJudgment(){
+ if(S.day<=BR_CFG.protectionDays)return null;
+ if(!S.br.elimOrder.length)return null;
+ const code=S.br.elimOrder.shift();
+ const s=getStock(code);
+ if(s){s.eliminated=true;s.delisted=true;s.elimDay=S.day;}   /* ★ delisted 同步置位：异动提示/指数/新闻事件自动排除 */
+ S.br.eliminated.push({code:code,day:S.day});
+ S.br.elimCount++;
+ const name=s?s.name:code;
+ pushNews('清退','bad','💀 '+pick(SUN_QUOTES_DELIST).replace('{name}',name));
+ buildWatchlist();
+ if(S.br.holding===code){
+   /* ★ 命中持仓：专属演出——toast+横幅都点名，再判负 */
+   toast('💀 「'+name+'」被清退了——那是你的股票！','err');
+   S.flags.dead=1;S.deadReason='eliminated';pauseGame();
+   return {hit:true,code:code,name:name};}
+ toast('💀 今日清退：'+name,'err');   /* ★ 审判仪式感：不盯新闻流也不会错过 */
+ return {hit:false,code:code,name:name};}
+
+/* ★ 交换券刷新（Day4 起每 couponEveryDays 天刷为 1 张，上限 1 不累积） */
+/* 每难度券频覆盖（无则用 BR_CFG 默认） */
+function brCouponEvery(){return brDiff().couponEveryDays||BR_CFG.couponEveryDays;}
+function brMaybeCoupon(){
+ if(S.day<BR_CFG.protectionDays+1||S.day>=S.br.finalDay)return;   /* ★ 终局日不发券（发了也无可换对象） */
+ if((S.day-(BR_CFG.protectionDays+1))%brCouponEvery()===0){
+   S.br.coupons=1;
+   pushNews('道具','good','🎟️ 交换券刷新！可把持仓换成任意存活股票（最多持有 1 张，没用会留着）。');
+   toast('🎟️ 获得 1 张交换券','achv');}}
+
+/* 下一张交换券的刷新日（>当前日；无则返回 null） */
+function brNextCouponDay(){
+ let nd=BR_CFG.protectionDays+1;const every=brCouponEvery();
+ while(nd<=S.day)nd+=every;
+ return nd<=S.br.finalDay?nd:null;}
+
+/* ★ 用交换券换股（盘中） */
+function exchangeWithCoupon(){
+ if(!S.br)return;
+ if(!(S.br.coupons>0))return toast('没有可用的交换券','err');
+ if(S.phase!=='open'&&S.phase!=='pre')return toast('交换券只能在盘中或开盘前决策窗使用','err');
+ const to=S.selected;const ts=getStock(to);
+ if(!ts)return toast('请先选中要换入的股票','err');
+ if(ts.eliminated)return toast('「'+ts.name+'」已被清退，无法换入','err');
+ if(to===S.br.holding)return toast('已经持有这只了','err');
+ const from=getStock(S.br.holding);
+ S.br.holding=to;S.br.coupons=0;
+ pushNews('交换','good','🔄 你用交换券把「'+(from?from.name:'?')+'」换成了「'+ts.name+'」。');
+ toast('🔄 已换入「'+ts.name+'」','ok');
+ renderActionBtns();invalidateAll();autoSave();}
+
+/* ★ 线索调度（Day>=firstClueDay 每 clueEveryDays 天一张便条；弹窗阅读） */
+function brMaybeClue(){
+ if(!S.br||S.day<BR_CFG.firstClueDay)return;
+ const every=brDiff().clueEveryDays;
+ if((S.day-BR_CFG.firstClueDay)%every!==0)return;
+ const clue=brGenerateClue();
+ if(!clue)return;
+ S.br.clueLog.push(clue);
+ pushNews('线索','fun','🔎 孙割递来一张便条……（点开右下「线索档案」回读）');
+ mark('trades');
+ brShowClueModal(clue);}
+/* 孙割的便条弹窗（绝望难度隐藏类型标签——废话不可辨） */
+function brShowClueModal(clue){
+ const hideType=brDiff().cluePlan.noise>0;
+ const tag=hideType?'有人塞给你一张纸条':(clue.type==='important'?'<span style="color:var(--gold)">★ 重要线索</span>':(clue.type==='normal'?'<span style="color:var(--cyan)">普通线索</span>':'闲话'));
+ showModal('<h2>🔎 孙割的便条</h2><div class="msub">第 '+clue.day+' 日 · '+tag+'</div>'+
+  '<div style="margin:16px 0;padding:18px 20px;background:var(--inputbg);border-radius:10px;border:1px dashed var(--gold);font-size:13.5px;line-height:2;color:var(--dim)">'+clue.text+'</div>'+
+  '<div class="mbtns"><button class="mbtn pri" onclick="hideModal()">收好便条</button></div>',false,false);}
+
+
+/* ★ 线索生成（P3 实装隐晦模板库；P1b 占位文本，先保证调度与配额可测） */
+/* ═══════════ 二代线索内容库（P3） ═══════════
+   三类线索：
+   - 普通（个体级隐晦）：指向一只将被清退的股票，钩子式传闻，不点名
+   - 重要（属性级）：幸存者的类别特征；生成时校验「匹配且仍存活的候选 ≥2」，
+     绝不把候选缩到 1 只（绝望难度 1 幸存时任何唯一定位属性=泄底，校验自动拒绝）
+   - 废话（纯噪音）：不指向任何个股/可验证属性，绝望难度专属 */
+
+/* 每只股票的隐晦传闻模板（普通线索用；{n}=股票名不会出现在文本中，保证隐晦） */
+const BR_CLUE_NORMAL={
+ '600001':['最近街坊的餐馆都悄悄换了便宜的调味品，那坛子酱越来越没人开盖了','听说给火锅店供货的那条线，单子突然少了一半'],
+ '600002':['天气眼看要转凉，靠冰饮起家的那位怕是笑不出来了','冷饮摊的老主顾说：今年的味儿，淡了'],
+ '600003':['巷口面馆的老师傅突然告老还乡，灶台都凉了','速食面的批发商在清库存，价格压得离谱'],
+ '600004':['今年山里的核桃结得稀，老树像是累了','补脑的营生不好做了，学堂门口的摊贩都撤了'],
+ '600011':['那个只在夜里拼团的铺子，客服电话打不通三天了','九块九包邮的买卖，听说供货商跑了两家'],
+ '600012':['十元店的房东贴了告示，下季度租金翻倍','小商品批发的档口，一半卷帘门没拉开过'],
+ '600013':['宠物街的猫粮突然断了货，店家支支吾吾','给毛孩子看病的老大夫，挂牌歇业了'],
+ '600014':['短视频里红过的那口零食，博主们集体不推了','网红食品的代工厂被曝拖欠工人工资'],
+ '601001':['边境的朋友说，最近取钱要排长队，柜员却少了','有储户发现，那家钱庄的夜里总是灯火通明地搬箱子'],
+ '601002':['那把镰刀最近磨得太勤，连老客户都开始心慌','营业部的散户发现，荐股的老师换得越来越勤了'],
+ '601003':['口号喊得最响的那家，悄悄改了合同条款','理赔窗口前排起长队，出来的人都摇着头'],
+ '601004':['那几栋盖到一半的楼，塔吊已经停了一个月','售楼处的沙盘落了灰，置业顾问走了大半'],
+ '688001':['上游晶圆厂突然停产检修，交期一拖再拖','据说那批关键的料，卡在海关了'],
+ '688002':['讲量子课的大师最近停课了，学费也没退','实验室的仪器被搬走了一半，门卫说不知道'],
+ '688003':['那个虚拟世界，服务器夜里经常悄悄下线','元宇宙的地产中介，已经开始转行卖保险'],
+ '600276':['老中医堂的坐堂大夫，最近总是亲自抓药——伙计都散了','药柜里几味关键的药材，说是进不到货了'],
+ '600196':['西北的枸杞收成欠佳，收购价反而跌了','保温杯里的红色果子，最近泡的人少了'],
+ '603259':['那家大药房开始挂「清仓」的牌子，柜台空了半排','深夜的药店不再亮灯，卷帘门拉得特别早'],
+ '601857':['矿区的安检组进驻了，井口封了大半','运煤的车队在路边排了三天，没等到卸货'],
+ '600438':['屋顶上的蓝色板子，最近订单被退了两批','追着太阳跑的那位大侠，据说马都瘦了'],
+ '600900':['上游的坝突然减少放水，下游的轮机转得慢了','峡谷里的水位降了，露出十年前的刻痕'],
+ '603444':['那档选秀被爆料停录，练习生集体回了家','造星的流水线卡了壳，出道的名额砍了一半'],
+ '600037':['狗仔队被挖走了三个主力，镜头都卖了','头条的爆料越来越水，读者开始退订'],
+ '300888':['游戏服务器连着维护一周，公告只写「技术原因」','打雷的那天，机房跳了闸，再没合上'],
+ '300999':['镖局接了趟大单，货却迟迟没出城','走南闯北的那支队伍，最近只在城里绕圈'],
+ '301088':['跑腿小哥的接单量大跌，商家都自建了队伍','「万能到家」的招牌，漆掉了一半没人补'],
+ '688100':['天上飞的那门生意，预订页面一直显示「维护中」','买了上天票的乘客在营业厅吵了三天，没人出来解释'],
+ '688101':['太空采矿的探测队失联一个月，地面站闭口不谈','陨石带的那块矿权，突然被人挂上了转让'],
+ '600760':['北方铸造厂突然停止接单，炉子熄了火','看门的老兵说，最近进出的卡车都蒙着帆布'],
+ '600685':['那艘巨无霸主题的酒店，宴会订单接连取消','船坞里的检修拖了半年，客房灯一半是黑的'],
+};
+
+/* 废话线索池（纯噪音：不指向个股、不含可验证属性） */
+const BR_CLUE_NOISE=[
+ '孙割说：「涨久必跌，跌久必涨。」（说了等于没说）',
+ '便条上只画了一个微笑，没有别的字。',
+ '「有高人托梦，说大盘要变天。」（没说哪只，也没说怎么变）',
+ '孙割：「记住，风险与收益并存。」',
+ '便条背面印着一行小字：「本消息最终解释权归孙割所有。」',
+ '孙割神秘兮兮地递来一张纸，打开一看：是上个月的旧报纸。',
+ '「我认识的一个人，去年这个时候也问过我同样的问题。」孙割说完就走了。',
+ '便条上写着一个日期，但年份被咖啡渍晕掉了。',
+ '孙割：「信我的一次都赚了，不信我的……也赚了。」',
+ '一张空白的便条，右下角有个淡淡的镰刀水印。',
+];
+
+/* 重要线索属性维度（生成器逐项校验安全性） */
+const BR_CLUE_ATTRS=[
+ {key:'sector',text:v=>'幸存者当中，有做「'+v+'」生意的',
+  values:()=>{const set={};BR_STOCKS.forEach(s=>set[s.sector]=1);return Object.keys(set);},
+  match:(s,v)=>s.sector===v},
+ {key:'codeHead3',text:v=>'有一只幸存者的代码，是 '+v+' 开头的',
+  values:()=>{const set={};BR_STOCKS.forEach(s=>set[s.code.slice(0,3)]=1);return Object.keys(set);},
+  match:(s,v)=>s.code.slice(0,3)===v},
+ {key:'codeHead1',text:v=>'幸存者里有代码 '+v+' 字头挂牌的',
+  values:()=>['6','3','0'],
+  match:(s,v)=>s.code[0]===v},
+ {key:'startHigh',text:()=>'有幸存者的开盘价（起始价）在 20 块以上',
+  values:()=>['hi'],match:s=>s.start>=20},
+ {key:'startLow',text:()=>'有幸存者的开盘价（起始价）不到 10 块',
+  values:()=>['lo'],match:s=>s.start<10},
+ {key:'nameNum',text:()=>'有幸存者的名字里，藏着一个数字',
+  values:()=>['num'],match:s=>/[一二三四五六七八九十百千万0-9]/.test(s.name)},
+ {key:'nameDir',text:()=>'有幸存者的名字里，带着一个方位',
+  values:()=>['dir'],match:s=>/[东南西北中]/.test(s.name)},
+];
+
+/* 普通线索文本：模板库抽一条隐晦传闻（绝不含股票名） */
+function brNormalClueText(code){
+ const tpl=BR_CLUE_NORMAL[code];
+ if(tpl&&tpl.length)return pick(tpl);
+ return '最近有只股票的风声不太对劲，知情人不肯说是哪只。';}
+/* ★ 重要线索安全生成器：(a)命中≥1幸存者（真实性） (b)存活匹配≥2只（防唯一定位泄底） (c)不与历史重复 */
+function brPickSafeAttr(){
+ const usedTexts=S.br.clueLog.map(c=>c.text);
+ const attrs=brShuffle(BR_CLUE_ATTRS);
+ for(const a of attrs){
+  const vals=brShuffle(a.values());
+  for(const v of vals){
+   const text=a.text(v);
+   if(usedTexts.indexOf(text)>=0)continue;
+   const survMatch=S.br.survivors.filter(c=>{const s=getStock(c);return s&&a.match(s,v);});
+   if(survMatch.length<1)continue;
+   const aliveMatch=stocks.filter(s=>!s.eliminated&&a.match(s,v));
+   if(aliveMatch.length>=2)return {key:a.key,val:v,text:text};}}
+ return null;}
+/* ★ 线索生成：普通=个体隐晦（指向将死股）/ 重要=属性级（幸存类别特征）/ 废话=纯噪音 */
+function brGenerateClue(){
+ if(!S.br)return null;
+ const plan=brDiff().cluePlan,used=S.br.clueUsed;
+ /* ★ 剧本化教学：首条线索（Day3）固定普通线索、指向 Day4 将被清退的股票——次日应验，教会玩家「普通线索是真的」 */
+ if(S.day===BR_CFG.firstClueDay&&used.normal<(plan.normal||0)&&S.br.elimOrder.length){
+  used.normal++;
+  const t=S.br.elimOrder[0];
+  return {day:S.day,type:'normal',text:brNormalClueText(t),code:t,attr:null,val:null,verified:false};}
+ /* 配额优先序：普通(早期排除死股)→重要(中后期缩幸存范围)→废话(绝望专属噪音垫底) */
+ let type=null;
+ if(used.normal<(plan.normal||0))type='normal';
+ else if(used.important<(plan.important||0))type='important';
+ else if(used.noise<(plan.noise||0))type='noise';
+ if(!type)return null;
+ if(type==='normal'){
+  /* ★ P5：允许指向持仓（持仓将死必须可预警）；去重——已点过名的死股不再重复占用配额 */
+  const named={};S.br.clueLog.forEach(c=>{if(c.code)named[c.code]=1;});
+  const pool=S.br.elimOrder.slice(0,8).filter(c=>!brIsEliminated(c)&&!named[c]);
+  if(!pool.length)return null;   /* 无新目标：不消耗配额 */
+  used.normal++;
+  const t=pick(pool);
+  return {day:S.day,type:'normal',text:brNormalClueText(t),code:t,attr:null,val:null,verified:false};}
+ if(type==='important'){
+  const c=brPickSafeAttr();
+  if(!c)return null;             /* 无安全属性：不消耗配额（宁可少发不泄底） */
+  used.important++;
+  return {day:S.day,type:'important',text:c.text,code:null,attr:c.key,val:c.val,verified:false};}
+ used.noise++;
+ return {day:S.day,type:'noise',text:pick(BR_CLUE_NOISE),code:null,attr:null,val:null,verified:false};}
+
+
+/* ★ 收盘后验证普通线索是否应验（指向的股票已被清退）；记录应验股票名供档案展示 */
+function brVerifyClues(){
+ if(!S.br||!S.br.clueLog)return;
+ S.br.clueLog.forEach(c=>{
+  if(!c.verified&&c.code&&brIsEliminated(c.code)){
+   c.verified=true;
+   const s=getStock(c.code);
+   c.verifiedName=s?s.name:c.code;   /* 应验的股票叫什么（教学：让玩家学会「这类传闻=要死」） */
+   c.verifiedDay=s?s.elimDay:S.day;}});}
+
+/* ★ 玩家标记：预判清退/存疑/预判存活/清除 */
+function brMark(code,type){
+ const s=getStock(code);if(!s)return;
+ if(s.eliminated)return toast('已清退的股票不能改标记','err');
+ if(type==='clear')delete S.br.marks[code];else S.br.marks[code]=type;
+ s.mark=S.br.marks[code]||null;
+ buildWatchlist();mark('detail','story');autoSave();}
+
+/* ★ 覆盖确认（有进行中的局时，点难度卡先确认） */
+function confirmStartBr(diff){
+ if(S&&S.mode==='br2'&&S.br&&S.br.subscribed&&!S.flags.dead&&!S.flags.god){
+  showModal('<h2>⚠️ 开始新的一局？</h2><div class="msub">当前进度（第 '+S.day+' 日 · '+brDiff().name+'难度）将被覆盖，无法恢复</div>'+
+   '<div class="mbtns"><button class="mbtn ghost" onclick="showMainMenu()">再想想</button>'+
+   '<button class="mbtn pri" onclick="startBrGame(\''+diff+'\')">覆盖并开局</button></div>',false,true);return;}
+ startBrGame(diff);}
+
+/* ★ 标记菜单（右键 / 按钮触发） */
+function showMarkMenu(code){
+ if(!S||!S.br)return;
+ code=code||S.selected;
+ const s=getStock(code);if(!s)return;
+ if(s.eliminated)return toast('已清退的股票无需标记','err');
+ const cur=S.br.marks[code]||'';
+ const btn=(t,label,icon)=>'<button class="mbtn '+(cur===t?'pri':'ghost')+'" onclick="brMark(\''+code+'\',\''+t+'\');hideModal()">'+icon+' '+label+'</button>';
+ showModal('<h2>🏷️ 标记「'+s.name+'」</h2><div class="msub">你的预判（纯笔记，不影响游戏）</div>'+
+  '<div class="mbtns" style="flex-direction:column;gap:8px">'+
+  btn('elim','预判会被清退','🔴')+
+  btn('q','存疑','❓')+
+  btn('surv','预判能存活','🟢')+
+  '<button class="mbtn ghost" onclick="brMark(\''+code+'\',\'clear\');hideModal()">✖ 清除标记</button>'+
+  '<button class="mbtn ghost" onclick="hideModal()">取消</button></div>',false,true);}
+
+/* ★ 胜负判定（收盘后调用） */
+function checkEndBr(){
+ if(!S||S.mode!=='br2'||!S.br)return;
+ if(S.flags.dead||S.flags.god)return;
+ if(!S.br.subscribed)return;
+ if(S.br.holding&&brIsEliminated(S.br.holding)){
+   S.flags.dead=1;S.deadReason='eliminated';pauseGame();showFail();return;}
+ if(S.day>=S.br.finalDay&&S.phase==='closed'&&S.br.holding&&!brIsEliminated(S.br.holding)){
+   S.flags.god=1;S.br.won=true;pauseGame();showWin();}}
+
+/* ★ 胜利结局 */
+function showWin(){
+ S.flags.deadShown=1;
+ const held=getStock(S.br.holding);
+ const surv=S.br.survivors.length;
+ showModal('<h2>🏆 大逃杀 · 通关</h2>'+
+  '<div class="msub">'+brDiff().name+'难度 · 第 '+S.day+' 日 · 你活到了最后</div>'+
+  '<div style="margin:16px 0;padding:16px 20px;background:var(--inputbg);border-radius:10px;border:1px solid var(--line)">'+
+  '<p style="margin:0;font-size:13px;line-height:2;color:var(--dim)">'+
+  '在 '+BR_CFG.totalStocks+' 只股票的修罗场里，'+(BR_CFG.totalStocks-surv)+' 只被孙割一一清退，'+
+  '而你手里的<b style="color:var(--gold)">「'+(held?held.name:'')+'」</b>笑到了最后。<br>'+
+  '孙割看你的眼神，第一次多了一丝敬意：「有点东西。」</p></div>'+
+  '<div class="receipt">'+
+  '<div class="rl"><span>难度</span><b>'+brDiff().name+'</b></div>'+
+  '<div class="rl"><span>幸存股</span><b>'+(held?held.name:'--')+'</b></div>'+
+  '<div class="rl"><span>用时</span><b>'+S.day+' / '+S.br.finalDay+' 日</b></div>'+
+  '<div class="rl"><span>江湖称号</span><b class="gold">'+brRankTitle()+'</b></div>'+
+  brMarkStats()+'</div>'+
+  '<div class="mbtns"><button class="mbtn pri" onclick="restart()">再来一局</button></div>',false,true);}   /* ★ replace 清队直显：结局不排在便条堆后面 */
+
+/* ★ 失败结局（持仓被清退） */
+function showFail(){
+ S.flags.deadShown=1;
+ const held=getStock(S.br.holding);
+ const body='第 <b class="gold">'+S.day+'</b> 日，孙割叼着雪茄走到你面前，划掉了「<b class="dn">'+(held?held.name:'')+'」</b>。<br>'+
+  '「不好意思啊小韭菜，你这只……清退了。」<br><br>你的股票券化作废纸。大逃杀，没有幸存者以外的赢家。';
+ showModal('<h2>💀 结局 · 被清退</h2>'+
+  '<div class="msub">第 '+S.day+' 日 · 你的股票没能活到最后</div>'+
+  '<p style="margin:14px 0;font-size:13px;line-height:1.9;color:var(--dim)">'+body+'</p>'+
+  '<div class="receipt">'+
+  '<div class="rl"><span>难度</span><b>'+brDiff().name+'</b></div>'+
+  '<div class="rl"><span>倒在</span><b>第 '+S.day+' / '+S.br.finalDay+' 日</b></div>'+
+  '<div class="rl"><span>剩余幸存</span><b>'+brAliveStocks().length+' 只</b></div>'+
+  brMarkStats()+'</div>'+
+  '<div class="mbtns"><button class="mbtn pri" onclick="restart()">重开一把</button></div>',false,true);}   /* ★ replace 清队直显 */
+
+/* 称号（按难度+用时） */
+function brRankTitle(){
+ const fast=S.day<=S.br.finalDay-3;
+ if(S.diff==='despair')return fast?'天选韭菜':'独苗幸存者';
+ if(S.diff==='hard')return fast?'火眼金睛':'险中求胜';
+ return fast?'大逃杀老手':'稳稳幸福';}
+
+/* 标记命中统计（结局彩蛋） */
+function brMarkStats(){
+ if(!S.br)return '';
+ const m=S.br.marks||{};let hitE=0,totE=0,hitS=0,totS=0;
+ for(const c in m){
+   if(m[c]==='elim'){totE++;if(brIsEliminated(c))hitE++;}
+   else if(m[c]==='surv'){totS++;if(brIsSurvivor(c))hitS++;}}
+ if(!totE&&!totS)return '';
+ return '<div class="rl"><span>你的预判</span><b>清退命中 '+hitE+'/'+totE+' · 存活命中 '+hitS+'/'+totS+'</b></div>';}
+
+/* ★ HUD：难度/天数/幸存数/持仓/券 */
+function renderBrHud(){
+ const box=$('storyProgress');if(!box)return;
+ if(!S||S.mode!=='br2'||!S.br||S.flags.dead||S.flags.god){box.style.display='none';return;}
+ const alive=brAliveStocks().length;
+ const held=getStock(S.br.holding);
+ const dayShow=Math.min(S.day,S.br.finalDay);
+ let html='<div class="sp-title">🔪 大逃杀 · '+brDiff().name+'</div>'+
+  '<div class="sp-scene">第 '+dayShow+' / '+S.br.finalDay+' 日 · 幸存 '+alive+'/'+BR_CFG.totalStocks+'</div>';
+ html+='<div class="sp-sub">我的股票：'+(held?('<b style="color:var(--gold)">'+held.name+'</b>'):'<span style="color:var(--faint)">未认购</span>')+'</div>';
+ if(S.br.coupons>0)html+='<div class="sp-crisis" style="color:var(--cyan)">🎟️ 交换券 ×1 可用</div>';
+ else if(S.day>BR_CFG.protectionDays){
+   const next=brNextCouponDay();
+   if(next)html+='<div class="sp-sub" style="color:var(--faint)">下张交换券：第 '+next+' 日</div>';}
+ if(S.day<=BR_CFG.protectionDays)html+='<div class="sp-crisis" style="color:var(--up)">🛡️ 保护期（第 '+S.day+'/'+BR_CFG.protectionDays+' 天）</div>';
+ box.innerHTML=html;box.style.display='';}
+
+/* ★ 我的股票面板（替代持仓列表） */
+function renderMyStock(){
+ const pane=$('paneHold');if(!pane)return;
+ if(!S||S.mode!=='br2'||!S.br||!S.br.holding){pane.innerHTML='<div class="empty">尚未认购股票</div>';return;}
+ const s=getStock(S.br.holding);if(!s){pane.innerHTML='<div class="empty">尚未认购股票</div>';return;}
+ const chg=(s.price/s.prevClose-1)*100;
+ pane.innerHTML='<div class="hold-row" style="cursor:default"><div><div class="nm">'+(s.eliminated?'💀 ':'')+s.name+'</div>'+
+  '<div class="qty mono">'+BR_CFG.qtyPerCoupon+'股 · '+s.sector+' · '+s.code+'</div></div>'+
+  '<div class="px mono">'+fmt2(s.price)+'</div>'+
+  '<div class="pnl mono '+cls(chg)+'">'+sgnPct(chg)+'</div></div>'+
+  (s.eliminated?'<div style="padding:8px 12px;font-size:11px;color:var(--dn)">已于第 '+s.elimDay+' 日被清退</div>':'');}
+
+/* ★ 线索档案面板（替代成交记录） */
+/* ★ 线索档案面板（替代成交记录；绝望难度隐藏类型标签） */
+function renderClues(){
+ const pane=$('paneTrade');if(!pane)return;
+ if(!S||S.mode!=='br2'||!S.br||!S.br.clueLog||!S.br.clueLog.length){pane.innerHTML='<div class="empty">还没有线索</div>';return;}
+ const hideType=brDiff().cluePlan.noise>0;
+ pane.innerHTML=S.br.clueLog.slice().reverse().map(c=>{
+  const tag=hideType?'孙割的便条':(c.type==='important'?'<span style="color:var(--gold)">★重要</span>':(c.type==='normal'?'<span style="color:var(--cyan)">普通</span>':'<span style="color:var(--faint)">便条</span>'));
+  const ver=c.verified?(' <span style="color:var(--up);font-size:10px">✓已应验：'+(c.verifiedName||'?')+'（第 '+c.verifiedDay+' 日清退）</span>'):'';
+  return '<div class="tr-row" style="flex-direction:column;align-items:flex-start;gap:4px"><span class="tm mono">D'+c.day+' '+tag+ver+'</span><span style="font-size:12px;line-height:1.6">'+c.text+'</span></div>';}).join('');}
+
+
+/* ================= 配置 ================= */
+const CFG={ticksPerDay:36,candleTicks:4,baseInterval:3750,maxCandles:280,chartCandles:270,
+  commission:0.00025,minCommission:5,stampTax:0.0005,
+  alertStock:6,bankruptNet:1000};
+
+const THEMES=['餐饮','消费','金融','科技','医药','能源','娱乐','服务','航天','军工'];
+/* ================= 工具 ================= */
+const $=id=>document.getElementById(id);
+const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
+function gauss(){let u=0,v=0;while(!u)u=Math.random();while(!v)v=Math.random();return Math.sqrt(-2*Math.log(u))*Math.cos(2*Math.PI*v);}
+const pick=a=>a[Math.floor(Math.random()*a.length)];
+const fmt2=n=>n.toLocaleString('zh-CN',{minimumFractionDigits:2,maximumFractionDigits:2});
+const money=n=>(n<0?'-¥':'¥')+fmt2(Math.abs(n));      /* ★ 支持负现金显示 */
+const sgnPct=v=>(v>=0?'+':'')+v.toFixed(2)+'%';
+const cls=v=>v>=0?'up':'dn';
+const r2=n=>Math.round(n*100)/100;
+const LS={_warned:false,
+ get(k){try{return localStorage.getItem(k);}catch(e){return null;}},
+ set(k,v){try{localStorage.setItem(k,v);return true;}
+   catch(e){if(!LS._warned){LS._warned=true;
+     toast('⚠️ 浏览器禁用了本地存储：进度无法自动保存，请用顶栏「⬇」手动导出存档','err');}
+    return false;}},
+ del(k){try{localStorage.removeItem(k);}catch(e){}}};
+function clockLabel(t){const m=570+Math.round(t*(330/CFG.ticksPerDay));return String(Math.floor(m/60)).padStart(2,'0')+':'+String(m%60).padStart(2,'0');}
+function fitCanvas(cv){const d=devicePixelRatio||1,W=cv.clientWidth,H=cv.clientHeight;
+ if(cv.width!==Math.round(W*d)||cv.height!==Math.round(H*d)){cv.width=Math.round(W*d);cv.height=Math.round(H*d);}
+ const ctx=cv.getContext('2d');ctx.setTransform(d,0,0,d,0,0);ctx.clearRect(0,0,W,H);return{ctx,W,H};}
+function makeDraggable(panel,handle){
+ const anchor=e=>{
+   if(e.target.closest('button,input,select,.cl'))return false;
+   const r=panel.getBoundingClientRect();
+   panel.style.left=r.left+'px';panel.style.top=r.top+'px';
+   panel.style.right='auto';panel.style.bottom='auto';panel.style.transform='none';
+   panel.dataset.ox=e.clientX-r.left;panel.dataset.oy=e.clientY-r.top;return true;};
+ const move=ev=>{const w=panel.offsetWidth,h=panel.offsetHeight;
+   panel.style.left=clamp(ev.clientX-+panel.dataset.ox,2,Math.max(2,innerWidth-w-2))+'px';
+   panel.style.top=clamp(ev.clientY-+panel.dataset.oy,2,Math.max(2,innerHeight-Math.min(h,60)-2))+'px';};
+ if(window.PointerEvent){
+  handle.addEventListener('pointerdown',e=>{
+   if(!anchor(e))return;
+   try{handle.setPointerCapture(e.pointerId);}catch(err){}
+   const mv=ev=>move(ev);
+   const up=()=>{handle.removeEventListener('pointermove',mv);handle.removeEventListener('pointerup',up);
+     handle.removeEventListener('pointercancel',up);};
+   handle.addEventListener('pointermove',mv);handle.addEventListener('pointerup',up);
+   handle.addEventListener('pointercancel',up);
+   e.preventDefault();});
+ }else{
+  handle.addEventListener('mousedown',e=>{
+   if(!anchor(e))return;
+   const mv=ev=>{move(ev);ev.preventDefault();};
+   const up=()=>{document.removeEventListener('mousemove',mv);document.removeEventListener('mouseup',up);};
+   document.addEventListener('mousemove',mv);document.addEventListener('mouseup',up);
+   e.preventDefault();});}}
+
+/* ================= 主题 ================= */
+const PALETTES={
+ dark:{hollow:'#101a27',grid:'rgba(90,120,160,.13)',axis:'#5b7290',up:'#ff5252',dn:'#2bd48a',cross:'rgba(255,255,255,.25)',tipbg:'rgba(10,16,23,.92)',tipbd:'rgba(255,255,255,.15)',line:'#e8f1ff',base:'rgba(245,185,66,.55)',ma5:'rgba(245,185,66,.9)',ma10:'rgba(90,209,255,.85)',txt:'#d9e4f2',fillUp:'rgba(255,82,82,.12)',fillDn:'rgba(43,212,138,.12)'},
+ light:{hollow:'#ffffff',grid:'rgba(70,90,120,.15)',axis:'#7a8ba0',up:'#e02e2e',dn:'#0a9e5c',cross:'rgba(0,0,0,.22)',tipbg:'rgba(255,255,255,.96)',tipbd:'rgba(0,0,0,.12)',line:'#26303c',base:'rgba(200,140,20,.6)',ma5:'rgba(200,140,20,.9)',ma10:'rgba(20,110,200,.85)',txt:'#182430',fillUp:'rgba(224,46,46,.10)',fillDn:'rgba(10,158,92,.10)'}
+};
+let PAL=PALETTES.dark;
+function applyTheme(t){document.documentElement.dataset.theme=t;PAL=PALETTES[t]||PALETTES.dark;
+ const mt=$('metaTheme');if(mt)mt.content=(t==='light')?'#eef1f6':'#0a1017';
+ $('btnTheme').textContent=t==='light'?'🌙':'☀️';if(S)drawChart();}
+function toggleTheme(){applyTheme(document.documentElement.dataset.theme==='light'?'dark':'light');autoSave();}
+
+/* ================= 状态 ================= */
+let S=null,stocks=[],timer=null,prevPx={},HV={k:null,f:null};
+let chipsMode=null,veilBusy=false,modalResume=false;
+
+function newState(){
+ return{day:1,tick:0,mode:'lobby',diff:'easy',
+  selected:'',
+  speed:1,paused:false,phase:'pre',chartMode:'k',news:[],lastAbnormal:null,
+  regime:1,indexOpen:1000,indexLevel:1000,
+  br:null,deadReason:'',
+  flags:{}};}
+
+function presim(s){let p=s.start;
+ for(let d=0;d<80;d++)for(let c=0;c<9;c++){
+   const o=p,r=s.drift*1.4+gauss()*s.vol*1.15;let cl=Math.max(0.5,o*(1+r));
+   const h=Math.max(o,cl)*(1+Math.abs(gauss())*s.vol*0.45),l=Math.min(o,cl)*(1-Math.abs(gauss())*s.vol*0.45);
+   s.candles.push({o,h,l,c:cl});p=cl;}
+ s.candles=s.candles.slice(-CFG.maxCandles);s.price=+p.toFixed(2);s.prevClose=s.price;s.open=s.price;
+ s.high=s.price;s.low=s.price;s.todaySeries=[s.price];}
+const getStock=c=>stocks.find(s=>s.code===c);
+/* ★ 全场动态链式指数：indexLevel（昨收基准）× 当日全场等权平均 price/prevClose
+   新股上市自动纳入、退市自动剔除，链式衔接不跳变 */
+function marketRatio(){let t=0,n=0;
+ stocks.forEach(s=>{if(s.delisted||s.eliminated||!s.listed||!(s.prevClose>0))return;t+=s.price/s.prevClose;n++;});
+ return n?t/n:1;}
+function calcIndex(){return ((S&&S.indexLevel>0)?S.indexLevel:1000)*marketRatio();}
+
+
+
+/* ★ 统一的暂停形状（原来散落 9 处，先立桩，重构阶段把旧点位收拢进来） */
+function pauseGame(){S.paused=true;clearTimeout(timer);$('btnPause').textContent='▶';mark('header','action','story');}
+
+
+/* ================= 存档 ================= */
+function saveObj(){return{v:5,S,stocks,theme:document.documentElement.dataset.theme};}
+function autoSave(){
+ if(!S||S.mode!=='br2')return;   /* ★ 大厅态不落盘 */
+ LS.set(BR_SAVEKEY,JSON.stringify(saveObj()));}
+
+function exportSave(){
+ const blob=new Blob([JSON.stringify(saveObj())],{type:'text/plain'});
+ const url=URL.createObjectURL(blob);const a=document.createElement('a');
+ a.href=url;a.download='大逃杀_存档_第'+S.day+'天.txt';
+ document.body.appendChild(a);a.click();
+ setTimeout(()=>{try{URL.revokeObjectURL(url);}catch(e){}if(a.parentNode)a.parentNode.removeChild(a);},0);
+ toast('存档已导出（第 '+S.day+' 天）','ok');}
+function normalizeLoaded(d){
+ if(!d||typeof d!=='object'||!d.S||!Array.isArray(d.stocks))throw new Error('存档结构不完整');
+ if(d.v!==5)throw new Error('存档版本不符（需要 v5 大逃杀存档）');
+ S=d.S;stocks=d.stocks;
+ if(S.mode!=='br2'||!S.br||!Array.isArray(S.br.survivors)||!Array.isArray(S.br.elimOrder))
+   throw new Error('不是有效的大逃杀存档');
+ const num=(v,dflt)=>(typeof v==='number'&&isFinite(v))?v:dflt;
+ S.day=Math.max(1,Math.floor(num(S.day,1)));
+ S.tick=Math.max(0,Math.floor(num(S.tick,0)));
+ S.speed=[1,2,4,16].indexOf(+S.speed)>=0?+S.speed:1;
+ S.phase=(S.phase==='open'||S.phase==='closed')?S.phase:'pre';
+ S.paused=!!S.paused;
+ S.chartMode=(S.chartMode==='line')?'line':'k';
+ S.flags=(S.flags&&typeof S.flags==='object')?S.flags:{};
+ if(!Array.isArray(S.news))S.news=[];
+ S.regime=num(S.regime,1);
+ S.selected=(typeof S.selected==='string')?S.selected:'';
+ S.diff=BR_DIFFICULTY[S.diff]?S.diff:'easy';
+ S.deadReason=(typeof S.deadReason==='string')?S.deadReason:'';
+ const br=S.br;
+ br.holding=(typeof br.holding==='string')?br.holding:null;
+ br.coupons=Math.max(0,Math.floor(num(br.coupons,0)));
+ br.eliminated=Array.isArray(br.eliminated)?br.eliminated:[];
+ br.clueLog=Array.isArray(br.clueLog)?br.clueLog:[];
+ br.clueUsed=(br.clueUsed&&typeof br.clueUsed==='object')?br.clueUsed:{normal:0,important:0,noise:0};
+ br.marks=(br.marks&&typeof br.marks==='object')?br.marks:{};
+ br.omen=(br.omen&&typeof br.omen==='object')?br.omen:{};   /* 风声窗口（旧档缺省=无异动，不影响胜负） */
+ br.subscribed=!!br.subscribed;br.won=!!br.won;
+ br.elimCount=Math.max(0,Math.floor(num(br.elimCount,0)));
+ br.finalDay=Math.max(1,Math.floor(num(br.finalDay,BR_CFG.totalStocks-(BR_DIFFICULTY[S.diff]?BR_DIFFICULTY[S.diff].survivors:8)+BR_CFG.protectionDays)));
+ const seen=new Set();
+ stocks=stocks.filter(s=>{if(!s||typeof s.code!=='string'||seen.has(s.code))return false;seen.add(s.code);return true;});
+ stocks.forEach(s=>{
+   s.eliminated=!!s.eliminated;s.elimDay=num(s.elimDay,0);
+   s.mark=s.mark||null;
+   s.price=num(s.price,0);s.prevClose=num(s.prevClose,0);
+   if(!(s.price>0))s.price=s.prevClose||num(s.start,10)||10;
+   if(!(s.prevClose>0))s.prevClose=s.price;
+   s.open=num(s.open,s.prevClose);s.high=num(s.high,s.price);s.low=num(s.low,s.price);
+   s.start=num(s.start,s.price);s.vol=num(s.vol,0.003);s.drift=0;
+   s.candles=Array.isArray(s.candles)?s.candles:[];
+   s.todaySeries=(Array.isArray(s.todaySeries)&&s.todaySeries.length)?s.todaySeries:[s.price];
+   s.bias=num(s.bias,0);s.biasTicks=num(s.biasTicks,0);
+   if(!Array.isArray(s.rets))s.rets=[];   /* ★ 异动提示的近期涨跌序列（旧档缺省=空，收盘重新累积） */
+   s.limit=999;s.limitState=0;s.limitNews=false;s.delisted=!!s.eliminated;s.listed=true;s.alertDay=0;});
+ if(stocks.length!==BR_STOCKS.length)throw new Error('存档股票数与当前版本不符（'+stocks.length+'≠'+BR_STOCKS.length+'）');
+ if(br.survivors.length!==(BR_DIFFICULTY[S.diff]?BR_DIFFICULTY[S.diff].survivors:0))throw new Error('存档难度数据不一致');
+ for(const c of br.survivors){if(!getStock(c))throw new Error('存档引用了不存在的股票');}
+ S.indexLevel=(num(S.indexLevel,0)>0)?S.indexLevel:1000;
+ S.indexOpen=(num(S.indexOpen,0)>0)?S.indexOpen:S.indexLevel;}
+
+function importSave(input){const f=input.files[0];if(!f)return;
+ const rd=new FileReader();
+ rd.onload=e=>{
+  let d=null;
+  try{d=JSON.parse(e.target.result);}catch(err){return toast('存档文件不是合法 JSON','err');}
+  clearTimeout(timer);
+  try{
+   normalizeLoaded(d);
+   applyTheme(d.theme||'dark');
+   buildWatchlist();
+   if(S.selected&&!getStock(S.selected))S.selected=stocks[0].code;
+   selectStock(S.selected);renderActionBtns();invalidateAll();
+   if(S.phase==='open'&&!S.paused&&!S.flags.dead&&!S.flags.god)schedule();
+   autoSave();toast('存档导入成功（第 '+S.day+' 天 · '+brDiff().name+'）','ok');hideModal();
+   if(S.flags.dead&&!S.flags.deadShown)showFail();
+   else if(S.flags.god&&!S.flags.deadShown)showWin();
+  }catch(err){
+   toast('存档读取失败：'+((err&&err.message)||err),'err');
+   newGame();showMainMenu();}};
+ rd.onerror=()=>toast('文件读取失败','err');
+ rd.readAsText(f);input.value='';}
+
+
+/* ================= 渲染管线 ================= */
+const dirty={header:1,watchlist:1,detail:1,trade:1,assets:1,holdings:1,trades:1,news:1,action:1,story:1};
+let rafPending=false;
+function mark(){for(let i=0;i<arguments.length;i++)dirty[arguments[i]]=1;scheduleRender();}
+function invalidateAll(){for(const k in dirty)dirty[k]=1;scheduleRender();}
+function updateAll(){invalidateAll();}
+function scheduleRender(){if(!rafPending){rafPending=true;requestAnimationFrame(doRender);}}
+function doRender(){rafPending=false;
+ if(dirty.header){updateHeader();dirty.header=0;}
+ if(dirty.watchlist){updateWatchlist();dirty.watchlist=0;}
+ if(dirty.detail){updateDetail();dirty.detail=0;}
+ if(dirty.trade){updateTradePanel();dirty.trade=0;}
+ if(dirty.assets){updateAssets();dirty.assets=0;}
+ if(dirty.holdings){renderMyStock();dirty.holdings=0;}
+ if(dirty.trades){renderClues();dirty.trades=0;}
+ if(dirty.news){renderNews();dirty.news=0;}
+ if(dirty.action){phaseBtn();dirty.action=0;}
+ if(dirty.story){renderBrHud();dirty.story=0;}}
+
+
+/* ================= 新闻 ================= */
+const FLAVOR=['营业部大爷：盯了一上午盘，一笔没做，这叫定力','论坛热帖：满仓踏空是一种什么样的体验？',
+ '某券商研报标题火了：《一切还欠你一个晴天》','传言某人靠一只股票赚十倍，网友：他是做梦买的',
+ '外卖小哥也在打听股票，情绪指标似乎亮起了红灯','投资者致电上市公司：请问董事长打游戏吗？',
+ '营业部空调坏了，散户们一边擦汗一边聊K线','热搜话题：如果只买银行股，能提前退休吗？',
+ '基金经理直播卡成PPT，弹幕齐刷「加仓」','菜市场大妈：我卖白菜的时候就知道这股要涨',
+ '某券商晨会纪要流出，核心观点四个字：别追高','萌新发帖提问：一手是多少股？在线等，挺急的',
+ '行情软件弹窗：您关注的股票有异动，请保持冷静','老股民心得：少熬夜、多看盘、别动气',
+ '媒体评论：价值投资没有错，只是暂时没兑现','开户数又创新高，00后带着压岁钱进场了',
+ '投资群日常打卡：今天你猜对大盘方向了吗？','股吧新吧规：禁止骂人，只许哭穷'];
+function pushNews(tag,clsN,text){
+ S.news.unshift({day:S.day,
+  time:S.phase==='open'?clockLabel(S.tick):(S.phase==='closed'?'盘后':'盘前'),
+  tag,cls:clsN,text});
+ if(S.news.length>50)S.news.pop();mark('news');}
+function renderNews(){const pane=$('paneNews');const frag=document.createDocumentFragment();
+ S.news.forEach(n=>{const el=document.createElement('div');el.className='news-it';
+  el.innerHTML='<span class="tm">D'+n.day+' '+n.time+'</span><span class="ntag '+n.cls+'">'+n.tag+'</span>'+
+   (n.html||('<span class="tx">'+n.text+'</span>'));
+  frag.appendChild(el);});
+ pane.innerHTML='';pane.appendChild(frag);
+ updateTicker();}
+function updateTicker(){const el=$('tickerRun');if(!el||!S)return;
+ const parts=[];
+ const idx=calcIndex();
+ parts.push('📊 韭菜综合指数 '+idx.toFixed(2)+'（'+sgnPct((idx/S.indexOpen-1)*100)+'）');
+ const ri=regimeInfo();parts.push('大盘风向 '+ri.i+ri.t+'（情绪值 '+(S.regime||1).toFixed(2)+'）');
+ if(S.mode==='br2'&&S.br){
+  parts.push('🔪 '+brDiff().name+'难度 · 第 '+S.day+'/'+S.br.finalDay+' 日 · 幸存 '+brAliveStocks().length+'/'+BR_CFG.totalStocks);
+  const held=getStock(S.br.holding);
+  if(held)parts.push('🎯 我的股票：'+held.name+(held.eliminated?'（💀已清退）':' '+fmt2(held.price)));
+  if(S.br.coupons>0)parts.push('🎟️ 交换券可用');}
+ S.news.slice(0,10).forEach(n=>parts.push('['+n.tag+'] '+n.text));
+ const txt=parts.join('　◆　');
+ el.innerHTML='<span>'+txt+'　◆　</span><span>'+txt+'　◆　</span>';
+ el.style.animation='none';void el.offsetWidth;
+ el.style.animation='tickMove '+Math.min(140,Math.max(28,parts.length*5.5))+'s linear infinite';}
+
+/* ═══ ★ 异动提示（取代原龙虎榜；涨幅榜对推理无价值，只保留走弱侦测）═══
+   只看「近 BR_CFG.omen.days 日累计跌幅」，且必须从观测价格算出（绝不读 S.br.omen）——
+   因此天然带假阳性（随机走弱的幸存者）与假阴性（40% 无异动的死股），保持软信号性质。
+   阈值 BR_CFG.abnormalCut 默认 -3.5%：风声股 3 日约 -5.4% 必上榜；
+   幸存者 3 日随机 σ≈3.3%，约 15% 会被误列 → 榜单可疑但不确证。 */
+function recordDailyRets(){   /* closeDay 内、prevClose 刷新前调用 */
+ const n=BR_CFG.omen.days;
+ stocks.forEach(s=>{
+  if(s.eliminated)return;
+  if(!Array.isArray(s.rets))s.rets=[];
+  s.rets.push(s.price/s.prevClose-1);
+  if(s.rets.length>n)s.rets.shift();});}
+function cumRet(s){
+ if(!Array.isArray(s.rets)||!s.rets.length)return 0;
+ let c=1;s.rets.forEach(r=>c*=(1+r));return c-1;}
+function buildAbnormal(){
+ const list=stocks.filter(s=>!s.eliminated&&Array.isArray(s.rets)&&s.rets.length>=2).map(s=>{
+  const cum=cumRet(s);
+  const downs=s.rets.filter(r=>r<0).length;
+  return {code:s.code,name:s.name,sector:s.sector,cum:cum,days:s.rets.length,
+    weak:(cum<=BR_CFG.abnormalCut&&downs>=2)};});
+ list.sort((a,b)=>a.cum-b.cum);   /* 最弱的排最前 */
+ return {suspects:list.filter(x=>x.weak).slice(0,6),all:list};}
+function boardRows(arr){return arr.map((x,i)=>'<div class="bp-row"><span class="bp-rk">'+(i+1)+'</span>'+
+  '<span class="bp-nm" role="button" tabindex="0" onkeydown="if(event.key===\'Enter\')this.click()" onclick="selectStock(\''+x.code+'\')" title="点击直达">'+x.name+'</span>'+
+  '<span class="bp-chg mono '+cls(x.cum)+'">'+sgnPct(x.cum*100)+'</span></div>').join('');}
+function showBoardPanel(b){
+ $('boardTitle').textContent='📉 第 '+S.day+' 日 收盘异动提示';
+ const sus=b.suspects;
+ $('boardBody').innerHTML=(sus.length
+   ?'<div class="bp-sec dn">⚠️ 近 '+BR_CFG.omen.days+' 日持续走弱（'+sus.length+' 只）</div>'+boardRows(sus)
+   :'<div class="bp-sec">✅ 今日无明显异动</div>')+
+  '<div style="font-size:10px;color:var(--faint);margin-top:9px;text-align:center;line-height:1.7">累计跌幅 ≤ '+Math.abs(BR_CFG.abnormalCut*100).toFixed(1)+'% 且多日收跌才列入<br>'+
+  '<b style="color:var(--gold)">异动 ≠ 一定被清退</b>，幸存者也会随机下跌；反之部分死股毫无征兆<br>点击名称直达行情 · 拖标题栏可移动窗口</div>';
+ $('boardPanel').classList.add('show');}
+function closeBoard(){$('boardPanel').classList.remove('show');}
+function reopenBoard(){if(!S||!S.lastAbnormal)return toast('还没有异动提示（收盘后自动生成）','err');
+ showBoardPanel(S.lastAbnormal);}
+function pushAbnormalNews(b){
+ const sus=b.suspects;
+ if(!sus.length){
+  S.news.unshift({day:S.day,time:'15:00',tag:'异动',cls:'board',text:'今日盘面平静，无明显异动'});
+  if(S.news.length>50)S.news.pop();mark('news');return;}
+ const cell=x=>'<b style="color:var(--dn);cursor:pointer" onclick="selectStock(\''+x.code+'\')" title="点击直达">'+
+   x.name+'</b> <span class="mono dn">'+sgnPct(x.cum*100)+'</span>';
+ const html='<span class="tx">📉 <b>异动提示</b>：近 '+BR_CFG.omen.days+' 日持续走弱（点名字可直达）<br>'+
+  sus.slice(0,4).map(cell).join('　')+'</span>';
+ S.news.unshift({day:S.day,time:'15:00',tag:'异动',cls:'board',
+  text:'今日 '+sus.length+' 只股票持续走弱',html:html});
+ if(S.news.length>50)S.news.pop();mark('news');}
+function applyShock(s,pct){if(s.delisted)return;
+ const u=+(s.prevClose*(1+s.limit)).toFixed(2),d=+(s.prevClose*(1-s.limit)).toFixed(2);
+ s.price=+clamp(s.price*(1+pct),d,u).toFixed(2);s.high=Math.max(s.high,s.price);s.low=Math.min(s.low,s.price);
+ const c=s.candles[s.candles.length-1];if(c){c.c=s.price;c.h=Math.max(c.h,s.price);c.l=Math.min(c.l,s.price);}}
+function stockEvent(dir){const poolA=stocks.filter(x=>!x.delisted&&!x.eliminated&&x.listed);if(!poolA.length)return;
+ const s=pick(poolA);const x=20+Math.floor(Math.random()*180);let txt;
+ if(dir>0){txt=pick([s.name+'公告：签订 '+x+' 亿元重大合同',s.name+'业绩预喜：净利润同比预增 '+x+'%',
+   '机构扎堆调研 '+s.name+'，行业景气度提升',s.name+'新品发布获好评，订单饱满']);
+   applyShock(s,0.01+Math.random()*0.02);s.bias=0.0015+Math.random()*0.0015;s.biasTicks=8+Math.floor(Math.random()*7);}
+ else{txt=pick([s.name+'业绩爆雷：净利润同比下滑 '+x+'%','监管问询函直指 '+s.name+' 财务疑点',
+   s.name+'大股东宣布减持，市场情绪承压','传 '+s.name+'产品抽检存疑，公司回应称一切正常']);
+   applyShock(s,-(0.01+Math.random()*0.02));s.bias=-(0.0015+Math.random()*0.0015);s.biasTicks=8+Math.floor(Math.random()*7);}
+ pushNews(dir>0?'利好':'利空',dir>0?'good':'bad',txt);}
+function marketEvent(){const poolA=stocks.filter(x=>!x.delisted&&!x.eliminated&&x.listed);if(!poolA.length)return;
+ const good=Math.random()<0.55;const x=2000+Math.floor(Math.random()*6000);
+ const txt=good?pick(['央行宣布降准，释放长期资金约 '+x+' 亿元','多项活跃资本市场举措落地，情绪回暖'])
+             :pick(['外围市场剧烈波动，避险情绪升温','主力资金净流出，权重股承压']);
+ poolA.forEach(s=>{s.bias+=(good?1:-1)*(0.0006+Math.random()*0.0006);s.biasTicks=Math.max(s.biasTicks,10);
+   applyShock(s,(good?1:-1)*(0.002+Math.random()*0.004));});
+ pushNews('政策',good?'good':'bad',txt);}
+function maybeNews(){const r=Math.random();
+ if(r<0.004)stockEvent(1);else if(r<0.008)stockEvent(-1);
+ else if(r<0.010)marketEvent();else if(r<0.055)pushNews('杂谈','fun',pick(FLAVOR));}
+
+
+
+
+/* ================= 回合推进 ================= */
+function schedule(){clearTimeout(timer);if(!S||S.phase!=='open'||S.paused)return;
+ timer=setTimeout(()=>{tickStep();schedule();},CFG.baseInterval/S.speed);}
+function nextDayVeil(){
+ if(veilBusy||!S||S.phase==='open')return;
+ veilBusy=true;
+ const nd=(S.phase==='closed')?S.day+1:S.day;
+ /* ★ 大逃杀夜幕文案：保护期后每天都是审判日 */
+ const judg=(S.mode==='br2'&&nd>BR_CFG.protectionDays);
+ $('nightText').textContent=judg?('🌙 第 '+nd+' 日 · 拂晓将至 · ⚖️ 孙割的镰刀已磨好')
+                               :('🌙 第 '+nd+' 日 · 拂晓将至'+(S.mode==='br2'?' · 🛡️ 保护期':''));
+ const v=$('nightVeil');
+ v.classList.add('on');
+ setTimeout(()=>{
+   nextDay();
+   setTimeout(()=>{v.classList.remove('on');setTimeout(()=>{veilBusy=false;},850);},420);
+ },900);}
+function nextDay(){if(S.phase==='open')return;
+ if(S.mode==='br2'&&S.br&&!S.br.subscribed){toast('请先用股票券认购一只股票','err');return;}
+ if(S.phase==='closed')S.day++;
+ S.phase='pre';
+ closeBoard();
+ if(S.flags.dead||S.flags.god){pauseGame();renderActionBtns();invalidateAll();autoSave();return;}
+ brMaybeCoupon();
+ brMaybeClue();
+ if(S.day<=BR_CFG.protectionDays){brOpenDay();return;}   /* 保护期：无审判，直接开盘 */
+ /* ★ 开盘前决策窗（P5）：停在这里，玩家可看线索/用交换券，手动点「执行今日审判」才结算清退 */
+ if(S.day>BR_CFG.protectionDays){
+   pushNews('公告','bad','⚖️ 审判将至：孙割今天将清退一只股票（开盘前可用交换券逃生）');
+   toast('⚖️ 审判日：先确认持仓安全，再点「执行今日审判」','err');}
+ renderActionBtns();invalidateAll();autoSave();}
+/* ★ 执行审判并开盘（决策窗确认；保护期直接开盘） */
+function resolveJudgment(){
+ if(!S||S.phase!=='pre'||!S.br||!S.br.subscribed)return;
+ if(S.flags.dead||S.flags.god)return;
+ const j=dailyJudgment();
+ if(j&&j.hit){pauseGame();invalidateAll();autoSave();showFail();return;}
+ S.lastJudged=j?j.name:null;   /* 供开盘横幅点名 */
+ brOpenDay();}
+/* ★ 开盘序列（定价+横幅+调度），nextDay 决策窗确认后与 dayOneSubscribe 共用 */
+function brOpenDay(){
+ stocks.forEach(s=>{
+  if(s.eliminated)return;
+  const o=(S.day===1)?+s.prevClose.toFixed(2)   /* ★ 第1日平开=起始价 */
+        :+Math.max(0.01,s.prevClose*(1+gauss()*s.vol*2.5)).toFixed(2);
+  s.open=o;s.price=o;s.high=o;s.low=o;s.todaySeries=[o];s.limitState=0;s.limitNews=false;
+  /* ★ 风声：当日处于走弱窗口的死股，全天带负 bias（tickStep 消费） */
+  const ob=brOmenBias(s.code,S.day);
+  if(ob){s.bias=ob;s.biasTicks=CFG.ticksPerDay;}else{s.bias=0;s.biasTicks=0;}});
+ S.phase='open';S.tick=0;
+ const modalUp=modalOpen();
+ S.paused=modalUp;modalResume=modalUp;
+ $('btnPause').textContent=S.paused?'▶':'⏸';
+ S.indexOpen=calcIndex();
+ banner('第 '+S.day+' 日 · 开 盘'+(S.day<=BR_CFG.protectionDays?' · 🛡️ 保护期':(S.lastJudged?' · 💀 '+S.lastJudged+' 清退':'')));
+ renderActionBtns();
+ if(!S.paused)schedule();
+ invalidateAll();autoSave();}
+
+function tickStep(){S.tick++;
+ for(const s of stocks){if(s.eliminated)continue;
+  const isNew=(S.tick-1)%CFG.candleTicks===0;
+  let r=gauss()*s.vol;   /* ★ drift=0：纯随机游走，价格不藏信号 */
+  if(s.biasTicks>0){r+=s.bias;s.biasTicks--;if(!s.biasTicks)s.bias=0;}
+  const p=+Math.max(0.01,s.price*(1+r)).toFixed(2);
+  if(isNew){s.candles.push({o:s.price,h:Math.max(s.price,p),l:Math.min(s.price,p),c:p});
+    if(s.candles.length>CFG.maxCandles)s.candles.shift();}
+  else{const c=s.candles[s.candles.length-1];if(c){c.c=p;c.h=Math.max(c.h,p);c.l=Math.min(c.l,p);}}
+  s.price=p;s.high=Math.max(s.high,p);s.low=Math.min(s.low,p);
+  s.todaySeries.push(p);if(s.todaySeries.length>CFG.ticksPerDay+2)s.todaySeries.shift();}
+ maybeNews();
+ mark('header','watchlist','detail','trade','assets','holdings');
+ if(S.tick>=CFG.ticksPerDay)closeDay();}
+
+function closeDay(){clearTimeout(timer);
+ S.indexLevel=calcIndex();
+ recordDailyRets();                 /* ★ 先记录当日涨跌（须在 prevClose 刷新前） */
+ const ab=buildAbnormal();
+ stocks.forEach(s=>{if(s.eliminated)return;
+   s.prevClose=s.price;s.bias=0;s.biasTicks=0;});
+ S.regime=clamp((S.regime||1)*0.9+0.1+gauss()*0.07,0.5,1.7);
+ pushNews('杂谈','fun',pick(FLAVOR));
+ pushAbnormalNews(ab);
+ S.lastAbnormal=ab;
+ S.phase='closed';banner('第 '+S.day+' 日 · 收 市');
+ showBoardPanel(ab);
+ brVerifyClues();
+ /* ★ P5修正：交换券持久保留（上限1张不累积），未用不清零——留给后续日子；用掉后等下次刷新补 */
+ renderActionBtns();invalidateAll();
+ checkEndBr();
+ autoSave();}
+
+function togglePause(){if(S.phase!=='open')return;
+ if(modalOpen())return;
+ S.paused=!S.paused;
+ $('btnPause').textContent=S.paused?'▶':'⏸';S.paused?clearTimeout(timer):schedule();mark('header');phaseBtn();}
+function mainAction(){if(!S||S.flags.dead||S.flags.god)return;
+ if(S.phase==='open'){if(S.paused){S.paused=false;$('btnPause').textContent='⏸';schedule();phaseBtn();}return;}
+ if(S.phase==='pre'&&S.mode==='br2'&&S.br&&S.br.subscribed){resolveJudgment();return;}   /* ★ 决策窗确认 */
+ nextDayVeil();}
+
+
+/* ================= ★ 剧情主界面 ================= */
+function showMainMenu(){
+ const canCont=!!S&&S.mode==='br2'&&S.br&&S.br.subscribed&&!S.flags.dead&&!S.flags.god;
+ const card=k=>{const d=BR_DIFFICULTY[k];
+  return '<div class="mm-card" role="button" tabindex="0" onkeydown="if(event.key===\'Enter\')this.click()" onclick="confirmStartBr(\''+k+'\')"><div class="ic">'+d.icon+'</div><div class="tt">'+d.name+'</div><div class="ds">'+d.desc+'</div><div class="tg hot">'+BR_CFG.totalStocks+' 只 · 每日清退</div></div>';};
+ showModal(
+ '<div class="mm-hero"><div class="lg">'+(APP_LOGO||'🔪')+'</div><h2>韭菜模拟器2 · 大逃杀</h2>'+
+ '<div class="sb">在「孙割」的注视下活到最后 · v'+APP_VERSION+' · 纯属虚构</div></div>'+
+ '<div class="mm-grid" style="grid-template-columns:1fr 1fr 1fr">'+card('easy')+card('hard')+card('despair')+'</div>'+
+ (canCont?'<div class="mbtns"><button class="mbtn pri" onclick="continueRun()">▶ 继续上局 · 第 '+S.day+' 日 · '+brDiff().name+'</button></div>'+
+  '<p style="font-size:10.5px;color:var(--faint);text-align:center;margin-top:10px;line-height:1.7">新开一局会<b class="up">清空当前进度</b>；继续则保留。</p>':'')+
+ '<div class="mbtns">'+
+  '<button class="mbtn ghost" onclick="showChangelog()">📜 日志</button>'+
+  '<button class="mbtn ghost" onclick="showAbout()">ℹ️ 关于</button></div>',
+ true,true);}
+
+function continueRun(){hideModal();invalidateAll();}
+
+/* ================= 渲染函数 ================= */
+const U={};
+function buildWatchlist(){
+ if(!S)return;
+ const box=$('wlList');box.innerHTML='';U.rows={};
+ const grp=t=>{const g=document.createElement('div');g.className='grp-head';g.textContent=t;box.appendChild(g);};
+ const row=s=>{const r=document.createElement('div');r.className='wl-row'+(s.eliminated?' dead':'');r.dataset.code=s.code;
+   r.innerHTML='<div><div class="wl-nm">'+(s.eliminated?'💀 ':'')+s.name+'</div><div class="wl-cd">'+s.code+(s.mark?'<span class="brmark">'+markIcon(s.mark)+'</span>':'')+'</div></div><div class="wl-px mono"></div><div class="wl-chg mono"></div>';
+   r.setAttribute('role','button');r.tabIndex=0;
+   r.onkeydown=e=>{if(e.key==='Enter')selectStock(s.code);};
+   r.onclick=()=>selectStock(s.code);
+   r.oncontextmenu=e=>{e.preventDefault();showMarkMenu(s.code);};
+   box.appendChild(r);
+   U.rows[s.code]={el:r,px:r.querySelector('.wl-px'),chg:r.querySelector('.wl-chg')};};
+ const shown={};
+ THEMES.forEach(t=>{const list=stocks.filter(s=>s.sector===t);
+   if(list.length){grp(t);list.forEach(row);shown[t]=1;}});
+ const other=stocks.filter(s=>!shown[s.sector]);
+ if(other.length){grp('其他');other.forEach(row);}
+ if(U.rows[S.selected])U.rows[S.selected].el.classList.add('sel');
+ updateWatchlist();}
+
+function selectStock(code){
+ const s=getStock(code);if(!s)return;
+ S.selected=code;
+ Object.values(U.rows).forEach(r=>r.el.classList.remove('sel'));
+ if(U.rows[code])U.rows[code].el.classList.add('sel');
+ HV.k=HV.f=null;mark('detail','trade');}
+
+function flash(el,dir){if(!el.animate)return;
+ try{el.animate([{textShadow:'0 0 12px '+(dir>0?PAL.up:PAL.dn)},{textShadow:'none'}],{duration:450});}catch(e){}}
+function regimeInfo(){const rg=S.regime||1;
+ if(rg>=1.25)return{i:'🔥',t:'强势多头',c:'var(--up)'};
+ if(rg>=1.08)return{i:'📈',t:'偏多',c:'var(--up)'};
+ if(rg>0.92)return{i:'➖',t:'震荡',c:'var(--dim)'};
+ if(rg>0.75)return{i:'📉',t:'偏空',c:'var(--dn)'};
+ return{i:'🧊',t:'弱势空头',c:'var(--dn)'};}
+function regimeLabel(){const r=regimeInfo();return[r.i+' 大盘风向：'+r.t,r.c];}
+function updateHeader(){const idx=calcIndex(),chg=idx/S.indexOpen-1;
+ $('mhIndex').textContent=idx.toFixed(2);$('mhIndex').className='vl mono '+cls(chg);
+ $('mhIndexChg').textContent=sgnPct(chg*100);$('mhIndexChg').className='sm mono '+cls(chg);
+ const ri=regimeInfo();
+ $('mhRegime').innerHTML='<span style="color:'+ri.c+'">'+ri.i+' '+ri.t+'</span>';
+ $('mhRegimeSub').textContent='情绪值 '+(S.regime||1).toFixed(2);
+ $('mhDay').textContent='第 '+S.day+' 日';
+ $('mhClock').textContent=S.phase==='open'?clockLabel(S.tick):(S.phase==='closed'?'15:00 已收市':'09:15 盘前');
+ const held=(S.br&&S.br.holding)?getStock(S.br.holding):null;
+ $('mhNet').textContent=held?(held.eliminated?'💀 已清退':held.name+' '+fmt2(held.price)):'--';
+ const bs=$('brandSub');
+ if(bs)bs.textContent='大逃杀 · '+((S.mode==='br2')?brDiff().name+'难度':'难度选择');
+ const fg=$('footGoal');
+ if(fg)fg.textContent=(S.mode==='br2'&&S.br&&S.br.subscribed)?('🎯 让「'+(held?held.name:'?')+'」活到第 '+S.br.finalDay+' 日'):'🎯 目标：活到最后一天';
+ const st=$('mhState'),dot=$('liveDot');dot.className='livedot';
+ if(S.phase==='open'){st.textContent=S.paused?'已暂停':'交易中';if(S.paused)dot.classList.add('paused');}
+ else if(S.phase==='closed'){st.textContent='已收市';dot.classList.add('closed');}
+ else{st.textContent='盘前集合';dot.classList.add('closed');}}
+
+function updateWatchlist(){let alive=0,dead=0;
+ for(const s of stocks){const r=U.rows[s.code];if(!r)continue;
+  if(s.eliminated){dead++;
+   r.px.textContent='--';r.px.className='wl-px mono';
+   r.chg.textContent='清退';r.chg.className='wl-chg mono dn';
+   continue;}
+  alive++;
+  const chg=(s.price/s.prevClose-1)*100;
+  const old=prevPx[s.code];
+  r.px.textContent=fmt2(s.price);r.px.className='wl-px mono '+cls(chg);
+  if(old!==undefined&&old!==s.price)flash(r.px,s.price-old);
+  prevPx[s.code]=s.price;
+  r.chg.className='wl-chg mono '+cls(chg);
+  r.chg.textContent=sgnPct(chg);}
+ $('wlLimit').textContent='存活 '+alive+' / 清退 '+dead;}
+
+const DSC={};
+function buildDetailShell(){const box=$('dStats');box.innerHTML='';
+ [['今开','open'],['最高','high'],['最低','low'],['昨收','prev'],['涨停价','up'],['跌停价','down'],['振幅','amp']].forEach(d=>{
+  const cell=document.createElement('div');cell.className='d-stat';
+  cell.innerHTML='<div class="k">'+d[0]+'</div><div class="v mono"></div>';
+  box.appendChild(cell);DSC[d[1]]={k:cell.querySelector('.k'),v:cell.querySelector('.v')};});}
+function setStat(k,label,v,c){const e=DSC[k];if(!e)return;e.k.textContent=label;e.v.textContent=v;e.v.className='v mono '+c;}
+function updateDetail(){
+ let s=getStock(S.selected);
+ if(!s){s=stocks[0];if(!s){$('dName').textContent='--';$('dPrice').textContent='--';$('dChg').textContent='--';return;}S.selected=s.code;}
+ const chg=s.price-s.prevClose,pct=chg/s.prevClose*100;
+ $('dName').textContent=(s.eliminated?'💀 ':'')+s.name;$('dName').style.fontSize='';
+ $('dCode').textContent=s.code;
+ $('dSector').textContent=s.sector;
+ const lt=$('dLimitTag');
+ if(s.eliminated){lt.style.display='';lt.textContent='💀 第 '+s.elimDay+' 日清退';   /* ★ 大逃杀：清退态取代涨跌停标签（本作无涨跌停） */
+   lt.style.borderColor=lt.style.color='var(--dn)';}
+ else lt.style.display='none';
+ $('dPrice').textContent=fmt2(s.price);$('dPrice').className='big mono '+cls(pct);
+ $('dChg').innerHTML='<span class="mono '+cls(pct)+'">'+(chg>=0?'+':'')+fmt2(chg)+'　'+sgnPct(pct)+'</span>';
+ const amp=(s.high-s.low)/s.prevClose*100;
+ const noLim=s.limit>=9;   /* ★ noPriceLimit 预设下 limit=999 */
+ setStat('open','今开',fmt2(s.open),cls(s.open-s.prevClose));
+ setStat('high','最高',fmt2(s.high),cls(s.high-s.prevClose));
+ setStat('low','最低',fmt2(s.low),cls(s.low-s.prevClose));
+ setStat('prev','昨收',fmt2(s.prevClose),'');
+ setStat('up','涨停价',noLim?'无涨跌停':fmt2(+(s.prevClose*(1+s.limit)).toFixed(2)),'up');
+ setStat('down','跌停价',noLim?'无涨跌停':fmt2(+(s.prevClose*(1-s.limit)).toFixed(2)),'dn');
+ setStat('amp','振幅',amp.toFixed(2)+'%','');
+ drawChart();}
+function maVal(arr,i,n){if(i+1<n)return null;let t=0;for(let k=i-n+1;k<=i;k++)t+=arr[k].c;return t/n;}
+function drawChart(){const s=getStock(S.selected);if(!s)return;S.chartMode==='k'?drawK(s):drawFenshi(s);}
+function drawK(s){const{ctx,W,H}=fitCanvas($('chart'));
+ const arr=s.candles,N=Math.min(arr.length,CFG.chartCandles),st=arr.length-N;if(!N)return;
+ const pR=58,pT=12,pB=8,pL=8,pw=W-pL-pR,ph=H-pT-pB;
+ let mn=1/0,mx=-1/0;
+ for(let i=st;i<arr.length;i++){mn=Math.min(mn,arr[i].l);mx=Math.max(mx,arr[i].h);
+  [maVal(arr,i,5),maVal(arr,i,10)].forEach(v=>{if(v!=null){mn=Math.min(mn,v);mx=Math.max(mx,v);}});}
+ const pad=(mx-mn)*0.08||1;mn-=pad;mx+=pad;
+ const X=i=>pL+(i-st+0.5)*pw/N,Y=v=>pT+(1-(v-mn)/(mx-mn))*ph;
+ ctx.font='11px "Microsoft YaHei"';
+ for(let g=0;g<=4;g++){const v=mn+(mx-mn)*g/4,y=Y(v);
+  ctx.strokeStyle=PAL.grid;ctx.beginPath();ctx.moveTo(pL,y);ctx.lineTo(W-pR,y);ctx.stroke();
+  ctx.fillStyle=PAL.axis;ctx.fillText(v.toFixed(2),W-pR+6,y+3);}
+ const cw=pw/N,bw=Math.max(2,cw*0.62);
+ for(let i=st;i<arr.length;i++){const c=arr[i],u=c.c>=c.o,x=X(i);
+  ctx.strokeStyle=ctx.fillStyle=u?PAL.up:PAL.dn;ctx.lineWidth=1;
+  ctx.beginPath();ctx.moveTo(x,Y(c.h));ctx.lineTo(x,Y(c.l));ctx.stroke();
+  const y1=Y(Math.max(c.o,c.c)),hh=Math.max(1.5,Y(Math.min(c.o,c.c))-y1);
+  if(u){ctx.fillStyle=PAL.hollow;ctx.fillRect(x-bw/2,y1,bw,hh);ctx.strokeRect(x-bw/2,y1,bw,hh);}
+  else ctx.fillRect(x-bw/2,y1,bw,hh);}
+ [[5,PAL.ma5],[10,PAL.ma10]].forEach(m=>{ctx.strokeStyle=m[1];ctx.lineWidth=1.2;ctx.beginPath();let started=false;
+  for(let i=st;i<arr.length;i++){const v=maVal(arr,i,m[0]);if(v==null)continue;
+   started?ctx.lineTo(X(i),Y(v)):(ctx.moveTo(X(i),Y(v)),started=true);}ctx.stroke();});
+ if(HV.k!=null&&HV.k>=st&&HV.k<arr.length){const c=arr[HV.k],x=X(HV.k),prev=HV.k>0?arr[HV.k-1].c:c.o,pc=(c.c/prev-1)*100;
+  ctx.strokeStyle=PAL.cross;ctx.setLineDash([3,3]);ctx.beginPath();ctx.moveTo(x,pT);ctx.lineTo(x,H-pB);ctx.stroke();ctx.setLineDash([]);
+  ctx.fillStyle=PAL.tipbg;ctx.strokeStyle=PAL.tipbd;
+  ctx.fillRect(pL+6,pT+4,178,54);ctx.strokeRect(pL+6,pT+4,178,54);
+  ctx.fillStyle=PAL.txt;
+  ctx.fillText('开 '+fmt2(c.o)+'  高 '+fmt2(c.h),pL+14,pT+18);
+  ctx.fillText('低 '+fmt2(c.l)+'  收 '+fmt2(c.c),pL+14,pT+33);
+  ctx.fillStyle=pc>=0?PAL.up:PAL.dn;ctx.fillText('涨跌 '+sgnPct(pc),pL+14,pT+48);}}
+function drawFenshi(s){const{ctx,W,H}=fitCanvas($('chart'));
+ const data=s.todaySeries,base=s.prevClose;if(data.length<2)return;
+ let dev=base*0.008;data.forEach(v=>dev=Math.max(dev,Math.abs(v-base)));
+ const mn=base-dev*1.2,mx=base+dev*1.2;
+ const X=i=>8+i/CFG.ticksPerDay*(W-70),Y=v=>10+(1-(v-mn)/(mx-mn))*(H-22);
+ ctx.font='11px "Microsoft YaHei"';
+ for(let g=0;g<=4;g++){const v=mn+(mx-mn)*g/4,y=Y(v),pc=(v/base-1)*100;
+  ctx.strokeStyle=PAL.grid;ctx.beginPath();ctx.moveTo(8,y);ctx.lineTo(W-62,y);ctx.stroke();
+  ctx.fillStyle=pc>=0?PAL.up:PAL.dn;ctx.fillText(sgnPct(pc),W-58,y+3);}
+ ctx.strokeStyle=PAL.base;ctx.setLineDash([4,4]);
+ ctx.beginPath();ctx.moveTo(8,Y(base));ctx.lineTo(W-62,Y(base));ctx.stroke();ctx.setLineDash([]);
+ ctx.beginPath();data.forEach((v,i)=>{i?ctx.lineTo(X(i),Y(v)):ctx.moveTo(X(0),Y(v));});
+ ctx.strokeStyle=PAL.line;ctx.lineWidth=1.5;ctx.stroke();
+ ctx.lineTo(X(data.length-1),Y(base));ctx.lineTo(X(0),Y(base));ctx.closePath();
+ ctx.fillStyle=data[data.length-1]>=base?PAL.fillUp:PAL.fillDn;ctx.fill();
+ if(HV.f!=null&&HV.f<data.length){const i=HV.f,v=data[i],pc=(v/base-1)*100,x=X(i);
+  ctx.strokeStyle=PAL.cross;ctx.setLineDash([3,3]);ctx.beginPath();ctx.moveTo(x,10);ctx.lineTo(x,H-12);ctx.stroke();ctx.setLineDash([]);
+  ctx.fillStyle='#fff';ctx.beginPath();ctx.arc(x,Y(v),3,0,7);ctx.fill();
+  ctx.fillStyle=PAL.tipbg;ctx.strokeStyle=PAL.tipbd;
+  ctx.fillRect(14,14,158,36);ctx.strokeRect(14,14,158,36);
+  ctx.fillStyle=PAL.txt;ctx.fillText(clockLabel(i)+'  '+fmt2(v),22,28);
+  ctx.fillStyle=pc>=0?PAL.up:PAL.dn;ctx.fillText('较昨收 '+sgnPct(pc),22,42);}}
+function renderActionBtns(){const box=$('actionBtns');if(!box)return;
+ if(!S||S.mode!=='br2'||!S.br){box.innerHTML='';return;}
+ if(!S.br.subscribed){box.innerHTML='<button class="btn-buy" onclick="dayOneSubscribe()">🎫 认购选中股</button>';return;}
+ if((S.phase==='open'||S.phase==='pre')&&S.br.coupons>0){box.innerHTML='<button class="btn-sell" onclick="exchangeWithCoupon()">🔄 交换券换股</button>';return;}
+ box.innerHTML='';}
+
+function updateTradePanel(){
+ const pn=$('phaseNote'),ti=$('tradeInfo');if(!pn||!ti)return;
+ if(!S||S.mode!=='br2'||!S.br){pn.textContent='';ti.innerHTML='';return;}
+ const held=getStock(S.br.holding);
+ pn.textContent=S.phase==='open'?'⏱ 盘中：行情自动推进；右键股票可标记预判':(S.phase==='pre'?(S.day>BR_CFG.protectionDays?'⚖️ 开盘前决策窗：今日将清退一只；有券可先换股，确认后点「执行今日审判」':'🛡️ 保护期盘前'):'🌙 收盘：点「进入下一日」继续大逃杀');
+ let h='';
+ if(!S.br.subscribed){h='🎫 你有一张<b style="color:var(--gold)">股票券</b>：左侧选中一只股票后点「认购选中股」，它的命运就是你的命运。';}
+ else{
+  h='我的股票：<b style="color:var(--gold)">'+(held?held.name:'--')+'</b> · 必须活到第 '+S.br.finalDay+' 日<br>';
+  h+='🎟️ 交换券：<b>'+(S.br.coupons>0?'1 张（选中存活股后点「交换券换股」）':'无')+'</b>';
+  const nd=(S.br.coupons<=0)?brNextCouponDay():null;
+  if(nd)h+=' · 下张第 '+nd+' 日';
+  h+='<br>🔎 线索：<b>'+S.br.clueLog.length+'</b> 条（右下「线索档案」页签）· 右键股票可标记预判';}
+ ti.innerHTML=h;}
+
+function updateAssets(){
+ if(!S)return;
+ const br=(S.mode==='br2'&&S.br);
+ const held=br?getStock(S.br.holding):null;
+ const ah=$('aHeld');
+ ah.textContent=held?(held.eliminated?'💀 '+held.name:held.name):(br?'未认购':'--');
+ ah.className='nw'+(held&&!held.eliminated?' gold':'');
+ $('aDiff').textContent=br?brDiff().name:'--';
+ $('aAlive').textContent=br?(brAliveStocks().length+' / '+BR_CFG.totalStocks):'--';
+ const ac=$('aCoupon');
+ ac.textContent=br?(S.br.coupons>0?'🎟️ 1 张':'无'):'--';
+ ac.className='chiplet '+(br&&S.br.coupons>0?'up':'');
+ $('rankName').textContent=br?('第 '+Math.min(S.day,S.br.finalDay)+' / '+S.br.finalDay+' 日 · 让持仓活到最后'):'大逃杀 · 难度选择中';
+ $('rankName').className='gold';
+ const rb=regimeLabel();
+ $('regimeTip').innerHTML='<span style="color:'+rb[1]+';font-weight:700">'+rb[0]+'</span>';}
+
+function phaseBtn(){const b=$('mainActionBtn'),h=$('mainHint');
+ if(!S){b.disabled=true;b.textContent='--';h.textContent='';return;}
+ if(S.flags.dead||S.flags.god){b.disabled=true;b.textContent='💀 本局已结束';h.textContent='请点弹窗按钮重开';return;}
+ if(S.mode!=='br2'||!S.br){b.disabled=true;b.textContent='🔪 韭菜模拟器2';h.textContent='请在主菜单选择难度开局';return;}
+ if(!S.br.subscribed){b.disabled=true;b.textContent='🎫 请先认购股票';h.textContent='左侧选中一只，点「认购选中股」';return;}
+ if(S.phase==='open'){
+   if(S.paused){b.disabled=false;b.textContent='▶ 继续行情';h.textContent='已暂停，慢慢想';}
+   else{b.disabled=true;b.textContent='📈 盘中行情推进…';h.textContent='需要思考就点暂停';}}
+ else if(S.phase==='closed'){b.disabled=false;b.textContent='📅 进入下一日';
+   h.textContent=(S.day>=S.br.finalDay)?'':'明天'+((S.day+1>BR_CFG.protectionDays)?'将清退一只股票':'仍在保护期');}
+ else if(S.phase==='pre'){   /* ★ 开盘前决策窗 */
+   b.disabled=false;b.textContent='⚖️ 执行今日审判';
+   h.textContent=S.br.coupons>0?'有交换券：可先换股再审判（审判不可逆）':'审判不可逆，先确认持仓安全';}
+ else{b.disabled=true;b.textContent='🔔 等待认购';h.textContent='';}}
+
+
+/* ================= toast / banner / modal ================= */
+function toast(msg,type){const t=document.createElement('div');t.className='toast '+(type||'ok');t.textContent=msg;
+ const box=$('toasts');box.appendChild(t);
+ while(box.children.length>5)box.firstChild.remove();
+ setTimeout(()=>{t.classList.add('out');setTimeout(()=>{if(t.parentNode)t.remove();},320);},3600);}
+function banner(txt){$('bannerText').textContent=txt;const b=$('dayBanner');
+ b.classList.remove('show');void b.offsetWidth;b.classList.add('show');}
+function modalOpen(){return !$('overlay').classList.contains('hidden');}
+let modalQueue=[];                     /* ★ 弹窗队列：同一天多个公告依次弹出，不再互相覆盖 */
+function paintModal(html,wide){
+ const mb=$('modalBox');
+ mb.classList.toggle('wide',!!wide);
+ mb.innerHTML=html;mb.scrollTop=0;
+ $('overlay').classList.remove('hidden');}
+function showModal(html,wide,replace){
+ if(S&&S.phase==='open'&&!S.paused&&!modalOpen()){
+   S.paused=true;clearTimeout(timer);$('btnPause').textContent='▶';modalResume=true;
+   mark('header','action');}
+ if(replace){modalQueue.length=0;paintModal(html,wide);return;}   /* 菜单导航：清队直显 */
+ if(modalOpen()){modalQueue.push({html:html,wide:!!wide});return;}
+ paintModal(html,wide);}
+function hideModal(){
+ if(modalQueue.length){const nx=modalQueue.shift();paintModal(nx.html,nx.wide);return;}
+ $('overlay').classList.add('hidden');
+ if(modalResume&&S){modalResume=false;
+   if(S.phase==='open'&&!S.flags.dead){S.paused=false;$('btnPause').textContent='⏸';schedule();}
+   mark('header','action');}}
+function drainModals(){modalQueue.length=0;$('overlay').classList.add('hidden');modalResume=false;}
+function resumeAfterModal(wasPaused){
+ if(!S)return;
+ if(modalOpen())return;              /* ★ 仍有排队弹窗时保持暂停，全部关完才恢复 */
+ if(S.flags.dead){pauseGame();return;}
+ S.paused=!!wasPaused;$('btnPause').textContent=S.paused?'▶':'⏸';
+ if(S.paused)clearTimeout(timer);else schedule();
+ mark('header','action');}
+
+function showRules(){
+ showModal('<h2>📖 大逃杀规则</h2><div class="msub">在孙割的注视下活到最后</div>'+
+  '<div style="font-size:12.5px;line-height:2;color:var(--dim);text-align:left;margin:12px 0">'+
+  '<b style="color:var(--gold)">🎯 胜利</b>：最后一天收盘时（'+['easy','hard','despair'].map(k=>BR_DIFFICULTY[k].name+'第'+(BR_CFG.totalStocks-BR_DIFFICULTY[k].survivors+BR_CFG.protectionDays)+'日').join(' / ')+'），你认购的股票仍然存活。<br>'+
+  '<b style="color:var(--dn)">💀 失败</b>：你持有的股票在任意一天被清退（当天开盘瞬间结算，当场判负）。<br>'+
+  '<b>🔪 清退</b>：'+BR_CFG.totalStocks+' 只股票，前 '+BR_CFG.protectionDays+' 天保护期，之后每天开盘随机清退 1 只。幸存者集合开局即定，但名单保密、顺序随机。<br>'+
+  '<b>🎫 股票券</b>：第 1 天用它认购一只股票的 '+BR_CFG.qtyPerCoupon+' 股——它的命运就是你的命运。<br>'+
+  '<b>🎟️ 交换券</b>：第 '+(BR_CFG.protectionDays+1)+' 天起定期刷新 1 张（简单/困难每3天、绝望每4天），<b>最多持有 1 张</b>；没用会一直留着，用掉后等下次刷新补。盘中或开盘前决策窗可把持仓换成任意存活股。最终日不发券。<br>'+
+  '<b>⚖️ 开盘前决策窗</b>：审判日开盘前游戏会停下——先看线索、必要时用券换股，再点「执行今日审判」。审判不可逆。<br>'+
+  '<b>🔎 线索</b>：孙割会递便条。普通线索隐晦指向将被清退的股票（应验后档案会标出是哪只）；重要线索给出幸存者的类别特征；绝望难度掺入纯噪音废话。<br>'+
+  '<b>📉 风声</b>：被盯上的股票，清退前几天<b>可能</b>持续走弱——留意跌幅榜。但只有约六成死股会露出马脚，也有幸存者纯属自己跌，<b>异动 ≠ 一定死，不跌 ≠ 一定活</b>。<br>'+
+  '<b>🏷️ 标记</b>：右键行情行（或用按钮）预判「会清退/存疑/会存活」，结局结算命中率。<br>'+
+  '<b>⚠️ 孙割的推荐</b>：他第 1 天热情推荐的那只……你信吗？</div>'+
+  '<div class="mbtns"><button class="mbtn pri" onclick="hideModal()">明白了</button></div>',false,true);}
+
+/* ================= 关于 / 更新日志 ================= */
+function showAbout(){
+ showModal('<div class="about-logo">'+(APP_LOGO||'')+'</div>'+
+  '<div class="about-name">'+APP_NAME+'</div>'+
+  '<div class="about-ver">版本 '+APP_VERSION+'</div>'+
+  '<div class="about-cr">'+APP_COPYRIGHT+'<br><span class="about-rights">'+APP_RIGHTS+'</span></div>'+
+  (APP_EXTRA?'<div class="about-extra">'+APP_EXTRA+'</div>':'')+
+  '<div class="receipt" style="margin-top:16px">'+
+   '<div class="rl"><span>当前版本</span><b>'+APP_VERSION+'</b></div>'+
+   '<div class="rl"><span>作品名称</span><b>'+APP_NAME+'</b></div>'+
+   '<div class="rl"><span>版权</span><b>'+APP_COPYRIGHT+'</b></div>'+
+   '<div class="rl"><span>运行方式</span><b>纯本地离线 · 无需联网</b></div>'+
+   '<div class="rl"><span>存档位置</span><b>浏览器 localStorage</b></div></div>'+
+  '<p style="font-size:11px;color:var(--faint);text-align:center;line-height:1.8">本作为虚构娱乐作品，所有公司、代码、事件均为杜撰，<br>不构成任何投资建议。</p>'+
+  '<div class="mbtns">'+
+   '<button class="mbtn ghost" onclick="showChangelog()">📜 更新日志</button>'+
+   '<button class="mbtn pri" onclick="hideModal()">关闭</button></div>',false,true);}
+function showChangelog(){
+ const body=CHANGELOG.map((c,i)=>{
+   const items=(c.items||[]).map(x=>'<li>'+x+'</li>').join('');
+   return '<div class="cl-ver'+(i===0?' cur':'')+'">'+
+     '<div class="cl-vh">v'+c.v+(i===0?'<span class="curtag">当前版本</span>':'')+
+       (c.date?'<span class="cl-vd">'+c.date+'</span>':'')+'</div>'+
+     (c.title?'<div style="font-size:11px;color:var(--dim);margin-top:2px">'+c.title+'</div>':'')+
+     '<ul>'+items+'</ul></div>';}).join('');
+ showModal('<h2>📜 版本更新日志</h2><div class="msub">'+APP_NAME+' · 当前版本 '+APP_VERSION+'</div>'+
+  '<div class="cl-body">'+body+'</div>'+
+  '<p style="font-size:11px;color:var(--faint);text-align:center">'+APP_COPYRIGHT+' · '+APP_RIGHTS+'</p>'+
+  '<div class="mbtns">'+
+   '<button class="mbtn ghost" onclick="showAbout()">ℹ️ 关于本作</button>'+
+   '<button class="mbtn pri" onclick="hideModal()">关闭</button></div>',false,true);}
+
+function confirmRestart(){showModal('<h2>↺ 重新开局？</h2><div class="msub">当前进度与存档将被清空，回到主菜单</div>'+
+ '<div class="mbtns"><button class="mbtn ghost" onclick="hideModal()">再想想</button>'+
+ '<button class="mbtn pri" onclick="restart()">清空重开</button></div>');}
+function restart(){LS.del(BR_SAVEKEY);
+ closeBoard();
+ newGame();drainModals();showMainMenu();}
+
+function newGame(){clearTimeout(timer);
+ S=newState();stocks=[];
+ prevPx={};HV={k:null,f:null};modalResume=false;
+ S.indexOpen=1000;S.indexLevel=1000;
+ S.news=[];$('paneNews').innerHTML='';
+ U.rows={};const wl=$('wlList');if(wl)wl.innerHTML='';
+ renderActionBtns();invalidateAll();}
+
+
+/* ================= 控件绑定 ================= */
+$('btnPause').onclick=togglePause;
+document.querySelectorAll('#speedSeg [data-sp]').forEach(b=>b.onclick=()=>{
+ S.speed=+b.dataset.sp;document.querySelectorAll('#speedSeg [data-sp]').forEach(x=>x.classList.toggle('on',x===b));schedule();});
+document.querySelectorAll('#chartSeg button').forEach(b=>b.onclick=()=>{
+ S.chartMode=b.dataset.m;document.querySelectorAll('#chartSeg button').forEach(x=>x.classList.toggle('on',x===b));
+ HV.k=HV.f=null;drawChart();});
+document.querySelectorAll('.tabs-h button').forEach(b=>b.onclick=()=>{
+ document.querySelectorAll('.tabs-h button').forEach(x=>x.classList.toggle('on',x===b));
+ $('paneNews').classList.toggle('on',b.dataset.t==='news');
+ $('paneHold').classList.toggle('on',b.dataset.t==='hold');
+ $('paneTrade').classList.toggle('on',b.dataset.t==='trade');});
+const chartEl=$('chart');
+chartEl.addEventListener('mousemove',e=>{const r=chartEl.getBoundingClientRect(),s=getStock(S.selected);if(!s)return;
+ if(S.chartMode==='k'){const N=Math.min(s.candles.length,CFG.chartCandles),cw=(r.width-66)/N;
+  HV.k=clamp(Math.floor((e.clientX-r.left-8)/cw)+s.candles.length-N,s.candles.length-N,s.candles.length-1);}
+ else{HV.f=clamp(Math.round((e.clientX-r.left-8)/(r.width-70)*CFG.ticksPerDay),0,Math.min(s.todaySeries.length-1,CFG.ticksPerDay));}
+ drawChart();});
+chartEl.addEventListener('mouseleave',()=>{HV.k=HV.f=null;drawChart();});
+addEventListener('keydown',e=>{if(e.code==='Space'&&!/INPUT|TEXTAREA/.test(e.target.tagName)){e.preventDefault();togglePause();}});
+addEventListener('resize',()=>{if(S)drawChart();});
+addEventListener('beforeunload',()=>{if(S)autoSave();});
+makeDraggable($('boardPanel'),$('boardHead'));
+makeDraggable($('cheatPanel'),$('cheatHead'));
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+/* ===== ★ 作弊面板（大逃杀版 · F9） ===== */
+document.addEventListener('keydown',e=>{
+ const panel=$('cheatPanel');if(!panel)return;
+ const isOpen=panel.style.display==='block';
+ if(e.key==='F9'){e.preventDefault();
+  if(isOpen){panel.style.display='none';}
+  else{panel.style.display='block';fillCheatStocks();fillCheatElim();}
+  return;}
+ if(e.key==='Escape'&&isOpen){panel.style.display='none';}});
+function fillCheatStocks(){const sel=$('cheatStockSel');if(!sel)return;const keep=sel.value;
+ let html='';
+ for(let i=0;i<stocks.length;i++){html+='<option value="'+stocks[i].code+'">'+(stocks[i].eliminated?'💀':'')+stocks[i].name+' ('+stocks[i].code+')</option>';}
+ sel.innerHTML=html||'<option value="">（暂无股票）</option>';
+ if(keep){for(let j=0;j<sel.options.length;j++){if(sel.options[j].value===keep){sel.selectedIndex=j;break;}}}}
+function fillCheatElim(){const sel=$('cheatElimSel');if(!sel)return;
+ if(!S||!S.br){sel.innerHTML='<option value="">（未开局）</option>';return;}
+ sel.innerHTML=S.br.elimOrder.map(c=>{const s=getStock(c);return '<option value="'+c+'">'+(s?s.name:c)+'</option>';}).join('')||'<option value="">（清退池已空）</option>';}
+function cheatForceElim(){
+ if(!S||!S.br)return;
+ const code=$('cheatElimSel').value;
+ const i=S.br.elimOrder.indexOf(code);
+ if(i<0)return toast('该股不在清退池（可能是幸存者）','err');
+ S.br.elimOrder.splice(i,1);S.br.elimOrder.unshift(code);
+ toast('🔧 「'+getStock(code).name+'」已排到下一个清退','achv');
+ let guard=0;
+ while(guard++<4&&!S.flags.dead&&!S.flags.god){   /* 推进到该股的审判落地 */
+  if(S.phase==='open')cheatSkipDay();
+  if(S.phase==='pre'){resolveJudgment();if(getStock(code)&&getStock(code).eliminated)break;}
+  if(S.phase==='closed')nextDay();}
+ fillCheatElim();}
+function cheatReveal(){
+ if(!S||!S.br)return;
+ const surv=S.br.survivors.map(c=>{const s=getStock(c);return s?s.name:c;}).join('、');
+ showModal('<h2>🔧 透视：幸存者名单</h2><div class="msub">共 '+S.br.survivors.length+' 只（作弊信息，正式局请靠线索）</div>'+
+  '<p style="font-size:13px;line-height:2;color:var(--gold)">'+surv+'</p>'+
+  '<div class="mbtns"><button class="mbtn pri" onclick="hideModal()">知道了</button></div>',false,true);}
+function cheatGiveCoupon(){if(!S||!S.br)return;S.br.coupons=1;toast('🔧 交换券 +1','achv');renderActionBtns();invalidateAll();autoSave();}
+function cheatForceClue(type){if(!S||!S.br)return;
+ const c=brGenerateClue();
+ if(!c)return toast('线索配额已用完','err');
+ if(type)c.type=type;
+ S.br.clueLog.push(c);pushNews('线索','fun','🔎 （作弊）线索已注入');mark('trades');autoSave();}
+function cheatGotoFinal(){if(!S||!S.br)return;
+ let guard=0;
+ while(S.day<S.br.finalDay&&!S.flags.dead&&!S.flags.god&&guard++<120){
+  if(S.phase==='open')cheatSkipDay();
+  if(S.phase==='pre')resolveJudgment();
+  if(S.flags.dead||S.flags.god)break;
+  if(S.phase==='closed')nextDay();}
+ toast('🔧 已推进到最终日','achv');}
+function setPriceNow(s,price){
+ s.price=+Math.max(0.01,price).toFixed(2);
+ s.high=Math.max(s.high,s.price);s.low=Math.min(s.low,s.price);
+ const c=s.candles[s.candles.length-1];
+ if(c){c.c=s.price;c.h=Math.max(c.h,s.price);c.l=Math.min(c.l,s.price);}
+ if(s.todaySeries.length)s.todaySeries[s.todaySeries.length-1]=s.price;}
+function cheatPrice(){if(!S)return;
+ const code=$('cheatStockSel').value;const price=parseFloat($('cheatPriceInput').value);
+ if(!code||isNaN(price)||price<=0)return toast('请输入有效价格','err');
+ const s=getStock(code);if(!s)return;
+ setPriceNow(s,price);
+ toast('🔧 '+s.name+' 价格 → '+fmt2(s.price),'achv');updateAll();autoSave();}
+function cheatPriceMul(mul){if(!S)return;
+ const s=getStock($('cheatStockSel').value);if(!s)return;
+ setPriceNow(s,s.price*mul);
+ toast('🔧 '+s.name+' ×'+mul+' → '+fmt2(s.price),'achv');updateAll();autoSave();}
+function cheatSkipDay(){
+ if(!S||S.phase!=='open'){toast('当前不在盘中，无法快进','err');return;}
+ let guard=0;
+ while(S.tick<CFG.ticksPerDay&&guard++<CFG.ticksPerDay+2)tickStep();
+ invalidateAll();toast('⏩ 已快进到当天闭市','achv');}
+function cheatJumpDay(n){if(!S)return;
+ const target=Math.min(S.br?S.br.finalDay:BR_CFG.totalStocks,S.day+Math.max(1,Math.floor(+n||1)));
+ let guard=0;
+ while(S.day<target&&!S.flags.dead&&!S.flags.god&&guard++<120){
+  if(S.phase==='open')cheatSkipDay();
+  if(S.phase==='pre')resolveJudgment();
+  if(S.flags.dead||S.flags.god)break;
+  if(S.phase==='closed')nextDay();}}
+
+/* ================= 启动 ================= */
+(function boot(){
+ buildDetailShell();
+ const fv=$('footVer');if(fv)fv.textContent='v'+APP_VERSION+' · 更新日志';
+ const sb=$('sealBtn');if(sb)sb.title='关于本作 · v'+APP_VERSION;
+ const bc=$('btnChangelog');if(bc)bc.title='版本更新日志 · v'+APP_VERSION;
+ const raw=LS.get(BR_SAVEKEY);
+ let loaded=false;
+ if(raw){
+  try{const d=JSON.parse(raw);
+   if(d&&d.S&&Array.isArray(d.stocks)){normalizeLoaded(d);
+     applyTheme(d.theme||'dark');
+     buildWatchlist();
+     if(S.selected&&!getStock(S.selected))S.selected=stocks[0].code;
+     selectStock(S.selected);renderActionBtns();invalidateAll();
+     loaded=true;
+     toast('已载入存档（第 '+S.day+' 天 · '+brDiff().name+'难度）','ok');
+     if(S.phase==='open'&&!S.paused&&!S.flags.dead&&!S.flags.god)schedule();}
+   else{toast('本地存档已损坏，已清空','err');}
+  }catch(e){toast('本地存档读取失败：'+((e&&e.message)||e),'err');LS.del(BR_SAVEKEY);}
+ }
+ if(!loaded){applyTheme('dark');newGame();}
+ if(loaded&&S.flags.dead&&!S.flags.deadShown)showFail();
+ else if(loaded&&S.flags.god&&!S.flags.deadShown)showWin();
+ else showMainMenu();
+})();
+</script>
+</body>
+</html>
