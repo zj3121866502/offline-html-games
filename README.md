@@ -2,6 +2,9 @@
 
 纯 AI 生成的离线 HTML 小游戏合集。部分代码引用自非商业开源项目，仅限学习交流，禁止商业用途。
 
+- [在线玩游戏（GitHub Pages）](https://zj3121866502.github.io/offline-html-games/)
+- [查看源代码（GitHub 仓库）](https://github.com/zj3121866502/offline-html-games)
+
 ---
 
 ## 游戏列表
