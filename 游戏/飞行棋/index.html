@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="zh-cn">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>飞行棋</title>
+<link rel="stylesheet" href="style.css?v=4">
+</head>
+<body>
+<div id="wrap">
+  <div id="boardWrap"></div>
+  <div id="side">
+    <div id="gtitle">飞行棋</div>
+    <div id="turnBox">轮到 <b id="turnName">—</b><span id="againTag"></span></div>
+    <div id="diceBox">
+      <div id="die" class="die">&#9856;</div>
+      <button id="btnRoll" disabled>掷骰子</button>
+    </div>
+    <div id="log"></div>
+    <button id="btnNew">重新开局</button>
+  </div>
+</div>
+
+<!-- 开局面板 -->
+<div id="setup" class="overlay">
+  <div class="panel">
+    <h1>飞行棋</h1>
+    <div class="cfg-title">四方配置（玩家 / 电脑 / 无）</div>
+    <div id="cfgColors"></div>
+    <div class="cfg-title">终点模式</div>
+    <div id="cfgMode" class="cfg-line"></div>
+    <button id="btnStart" class="bigbtn">开始游戏</button>
+  </div>
+</div>
+
+<!-- 恢复上局 -->
+<div id="resume" class="overlay" style="display:none">
+  <div class="panel">
+    <p id="resumeText">检测到上局进度，要继续吗？</p>
+    <div class="btnrow">
+      <button id="btnResume" class="bigbtn">继续上局</button>
+      <button id="btnFresh" class="bigbtn plain">开新局</button>
+    </div>
+  </div>
+</div>
+
+<!-- 胜利 -->
+<div id="winBox" class="overlay" style="display:none">
+  <div class="panel">
+    <h2 id="winText"></h2>
+    <button id="btnAgain" class="bigbtn">再来一局</button>
+  </div>
+</div>
+
+<script src="board-data.js?v=5"></script>
+<script src="engine.js?v=5"></script>
+<script src="ai.js?v=5"></script>
+<script src="render.js?v=5"></script>
+<script src="main.js?v=5"></script>
+</body>
+</html>

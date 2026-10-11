@@ -1,0 +1,266 @@
+/* 围棋 · 双人对弈 —— 忠实仿 weiqigo 单机页的朴素风格 */
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  font-family: "Microsoft YaHei", "PingFang SC", "Segoe UI", sans-serif;
+  background: #f6f4ef;
+  color: #2b2b2b;
+  min-height: 100vh;
+}
+
+.hidden { display: none !important; }
+
+/* ---------------- 顶栏 ---------------- */
+.topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: #fff;
+  border-bottom: 1px solid #e2ded4;
+  padding: 10px 20px;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.brand {
+  font-size: 20px;
+  font-weight: 700;
+  letter-spacing: 2px;
+}
+
+.brand-sub {
+  font-size: 12px;
+  font-weight: 400;
+  color: #8a867c;
+  letter-spacing: 0;
+  margin-left: 8px;
+}
+
+.topbar-controls {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  flex-wrap: wrap;
+}
+
+.inline-label {
+  font-size: 13px;
+  color: #555;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.inline-label select {
+  font-size: 13px;
+  padding: 4px 6px;
+  border: 1px solid #cfcabf;
+  border-radius: 4px;
+  background: #fff;
+}
+
+.switch-label {
+  font-size: 13px;
+  color: #555;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+  user-select: none;
+}
+
+.switch-label input { width: 16px; height: 16px; cursor: pointer; }
+
+/* ---------------- 主体 ---------------- */
+main {
+  max-width: 780px;
+  margin: 0 auto;
+  padding: 14px 12px 40px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.status-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: #fff;
+  border: 1px solid #e2ded4;
+  border-radius: 8px;
+  padding: 10px 16px;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.turn-indicator {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.stone-icon {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  display: inline-block;
+  border: 1px solid #999;
+}
+
+.stone-icon.black { background: radial-gradient(circle at 35% 30%, #666, #000); }
+.stone-icon.white { background: radial-gradient(circle at 35% 30%, #fff, #d9d9d9); }
+
+.captures {
+  display: flex;
+  gap: 16px;
+  font-size: 13px;
+  color: #666;
+}
+
+.captures b { color: #2b2b2b; }
+
+/* ---------------- 提示条 ---------------- */
+.notice {
+  background: #fff8e1;
+  border: 1px solid #f0e0a0;
+  border-radius: 8px;
+  padding: 10px 14px;
+  font-size: 14px;
+  color: #6d5d1e;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.notice .notice-action {
+  flex-shrink: 0;
+}
+
+/* ---------------- 棋盘 ---------------- */
+.board-wrap {
+  display: flex;
+  justify-content: center;
+}
+
+#board {
+  width: 100%;
+  max-width: 760px;
+  height: auto;
+  border-radius: 8px;
+  box-shadow: 0 3px 14px rgba(60, 40, 10, 0.25);
+  cursor: pointer;
+  touch-action: manipulation;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+/* ---------------- 按钮区 ---------------- */
+.controls {
+  display: flex;
+  justify-content: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.btn {
+  font-size: 15px;
+  padding: 9px 22px;
+  border-radius: 6px;
+  border: 1px solid #cfcabf;
+  background: #fff;
+  color: #333;
+  cursor: pointer;
+  transition: background 0.15s, transform 0.05s;
+}
+
+.btn:hover { background: #f1eee6; }
+.btn:active { transform: translateY(1px); }
+
+.btn.primary {
+  background: #2e7d32;
+  border-color: #2e7d32;
+  color: #fff;
+}
+
+.btn.primary:hover { background: #276b2b; }
+
+.btn.danger {
+  color: #b3362c;
+  border-color: #dcb4ae;
+}
+
+.btn.danger:hover { background: #faf0ee; }
+
+.btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.notice-action .btn { padding: 6px 16px; font-size: 13px; }
+
+/* ---------------- 面板 ---------------- */
+.panel {
+  background: #fff;
+  border: 1px solid #e2ded4;
+  border-radius: 8px;
+  padding: 16px 20px;
+}
+
+.panel h2 {
+  font-size: 17px;
+  margin-bottom: 10px;
+}
+
+.panel .hint {
+  font-size: 13px;
+  color: #77725f;
+  line-height: 1.7;
+  margin-bottom: 12px;
+}
+
+.panel .row {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.result-detail {
+  font-size: 15px;
+  line-height: 1.9;
+  margin-bottom: 12px;
+}
+
+.result-detail .big {
+  font-size: 20px;
+  font-weight: 700;
+}
+
+.rules-note {
+  font-size: 12px;
+  color: #9a958a;
+  line-height: 1.8;
+  text-align: center;
+  padding: 0 10px;
+}
+
+/* ---------------- toast ---------------- */
+.toast {
+  position: fixed;
+  left: 50%;
+  bottom: 40px;
+  transform: translateX(-50%);
+  background: rgba(40, 36, 28, 0.92);
+  color: #fff;
+  font-size: 14px;
+  padding: 10px 20px;
+  border-radius: 20px;
+  z-index: 100;
+  pointer-events: none;
+  max-width: 86vw;
+  text-align: center;
+}

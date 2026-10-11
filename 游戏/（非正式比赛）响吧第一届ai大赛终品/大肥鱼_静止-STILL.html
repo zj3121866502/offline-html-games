@@ -1,0 +1,4060 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<title>静止</title>
+
+<!--
+  ═══════════════════════════════════════════════════════════════
+   这次藏东西的地方少了。因为上次本末倒置了。
+
+   只留两条：
+     ① 按  ↑↑↓↓←→←→BA
+     ② 活着的时候，在场上打一个「猫」字
+
+   还有一条不算彩蛋的，是这个游戏真正想说的话：
+
+     它们全都醒着，每一个都比你快 —— 除非你空着手。
+     鼠标划出的那个圈，是你能施加影响的全部范围。
+     圈里的会被钉住、被烧掉。
+     可你每攥住一个，圈就小一圈，你也慢一分。
+     你攥住的东西越多，你能攥住的越少。
+
+     第十二章叫「放手」。
+     那一章的门，只在你什么都没攥着的时候开。
+     你得一路空着手走过去 —— 而那是你唯一跑得过它们的时候。
+
+     这不是一条规则，这是一个隐喻。
+  ═══════════════════════════════════════════════════════════════
+-->
+
+<style>
+  *{margin:0;padding:0;box-sizing:border-box}
+  html,body{width:100%;height:100%;overflow:hidden;background:#04060b;
+    font-family:"Microsoft YaHei","PingFang SC",system-ui,sans-serif;-webkit-font-smoothing:antialiased}
+  body{display:flex;align-items:center;justify-content:center}
+  #game{display:block;cursor:default;touch-action:none;border-radius:8px;
+    box-shadow:0 24px 90px rgba(0,0,0,.9),0 0 0 1px rgba(120,200,255,.09)}
+  #veil{position:fixed;inset:0;background:#04060b;z-index:9;display:flex;
+    align-items:center;justify-content:center;color:#2b3550;font-size:13px;
+    letter-spacing:.5em;transition:opacity .45s;pointer-events:none}
+  #veil.gone{opacity:0}
+</style>
+</head>
+<body>
+<canvas id="game"></canvas>
+<div id="veil">静 止</div>
+
+<script>
+(function () {
+  'use strict';
+
+  // ══════════════════════════════════════════════════════════════
+  //  0 · 常量
+  // ══════════════════════════════════════════════════════════════
+  var W = 960, H = 600;
+  var FLOOR = 544, CEIL = 40;
+  var GRAV = 0.78, MOVE = 4.9, JUMP = 14.2, MAXFALL = 19;
+  var COYOTE = 7, BUFFER = 8, FRIC = 0.70;
+
+  var R_BASE = 124;                  // 时间场基础半径
+  var R_SHRINK = 0.085;              // 每钉住一个，半径缩这么多
+  var R_FLOOR = 0.45;                // 最多缩到基础的 45%
+  var R_LERP = 0.20;
+  var FIELD_DMG_EVERY = 11;          // 被钉住的敌人每 11 帧掉 1 血
+  var PULSE_CD = 78, PULSE_KNOCK = 13.5;   // PULSE_CD 只作默认值，实际以 WEAPONS[].cd 为准
+
+  var PW = 18, PH = 26;
+  var MAX_HP = 3, INVULN = 46;
+
+  var STATUE_LIFE = 60 * 16;         // 石头 16 秒后风化（只为控制场面，不影响通关判定）
+  var MAX_STATUE = 40;               // 场上石头上限，超了最老的先碎
+
+  var PAL = {
+    bg0: '#060a14', bg1: '#0d1526',
+    wall: '#1a2338', wallTop: '#2e3d5e',
+    ink: '#eaf2ff', dim: '#7f8fb4', faint: '#4a5876',
+    cy: '#4fe3ff', mint: '#43f5b0', gold: '#ffd166', pink: '#ff5d84',
+    violet: '#a98bff', orange: '#ff9d4d', red: '#ff4d5e',
+    stone: '#39425c', stoneDark: '#252c42', stoneRim: '#6b7aa8'
+  };
+
+  // ══════════════════════════════════════════════════════════════
+  //  1 · 工具
+  // ══════════════════════════════════════════════════════════════
+  function clamp(v, a, b) { return v < a ? a : (v > b ? b : v); }
+  function lerp(a, b, t) { return a + (b - a) * t; }
+  function rnd(a, b) { return a + Math.random() * (b - a); }
+  function dist(ax, ay, bx, by) { var dx = ax - bx, dy = ay - by; return Math.sqrt(dx * dx + dy * dy); }
+  function hsl(h, s, l, a) { return 'hsla(' + h + ',' + s + '%,' + l + '%,' + (a === undefined ? 1 : a) + ')'; }
+  function aabb(a, b) {
+    return a.x < b.x + b.w && a.x + a.w > b.x && a.y < b.y + b.h && a.y + a.h > b.y;
+  }
+  function ovX(a, b) { return Math.min(a.x + a.w, b.x + b.w) - Math.max(a.x, b.x); }
+  function ovY(a, b) { return Math.min(a.y + a.h, b.y + b.h) - Math.max(a.y, b.y); }
+  function rr(c, x, y, w, h, r) {
+    r = Math.min(r, w * .5, h * .5);
+    c.beginPath();
+    c.moveTo(x + r, y);
+    c.lineTo(x + w - r, y); c.arcTo(x + w, y, x + w, y + r, r);
+    c.lineTo(x + w, y + h - r); c.arcTo(x + w, y + h, x + w - r, y + h, r);
+    c.lineTo(x + r, y + h); c.arcTo(x, y + h, x, y + h - r, r);
+    c.lineTo(x, y + r); c.arcTo(x, y, x + r, y, r);
+    c.closePath();
+  }
+  // 按可用宽度裁字（中文按 1em、西文按 0.55em 估），宁短不溢
+  function fitText(s, maxW, size) {
+    var w = 0, out = '';
+    for (var i = 0; i < s.length; i++) {
+      var cw = size * (s.charCodeAt(i) < 256 ? 0.55 : 1.0);
+      if (w + cw > maxW) return out + '…';
+      w += cw; out += s[i];
+    }
+    return out;
+  }
+  // ctx.font 每帧会被赋值几十次，而带 fallback 的中文字体串每次都要重新解析 —— 缓存住。
+  // 注意：ctx.restore() 会把 font 回滚，所以 restore 时必须让缓存失效（见 boot）。
+  var _fontCache = '';
+  function txt(c, s, x, y, o) {
+    o = o || {};
+    var f = (o.w || '700') + ' ' + (o.s || 13) + 'px "Microsoft YaHei","PingFang SC",system-ui,sans-serif';
+    if (f !== _fontCache) { c.font = f; _fontCache = f; }
+    c.textAlign = o.a || 'left'; c.textBaseline = o.b || 'middle';
+    if (o.glow) { c.shadowColor = o.glow; c.shadowBlur = o.blur || 10; }
+    c.fillStyle = o.c || PAL.ink;
+    c.fillText(s, x, y);
+    c.shadowBlur = 0;
+  }
+
+  // ══════════════════════════════════════════════════════════════
+  //  2 · 音频总线（音效与音乐共用同一个 context）
+  // ══════════════════════════════════════════════════════════════
+  var Audio = (function () {
+    var ac = null, dead = false;
+    function ctx() {
+      if (ac) return ac;
+      if (dead) return null;
+      try {
+        var A = (typeof window !== 'undefined') && (window.AudioContext || window.webkitAudioContext);
+        if (!A) { dead = true; return null; }
+        ac = new A();
+      } catch (e) { dead = true; ac = null; }
+      return ac;
+    }
+    return {
+      ctx: ctx,
+      wake: function () {
+        var c = ctx();
+        if (c && c.state === 'suspended' && c.resume) { try { c.resume(); } catch (e) {} }
+        return c;
+      }
+    };
+  })();
+
+  // ══════════════════════════════════════════════════════════════
+  //  2b · 音效
+  // ══════════════════════════════════════════════════════════════
+  var Sound = (function () {
+    var on = true;
+    function t(f, d, ty, v, slide) {
+      if (!on) return;
+      var c = Audio.wake(); if (!c) return;
+      try {
+        var o = c.createOscillator(), g = c.createGain();
+        o.type = ty || 'square';
+        o.frequency.setValueAtTime(f, c.currentTime);
+        if (slide) o.frequency.exponentialRampToValueAtTime(Math.max(28, slide), c.currentTime + d);
+        g.gain.setValueAtTime(0.0001, c.currentTime);
+        g.gain.exponentialRampToValueAtTime(v || .05, c.currentTime + .008);
+        g.gain.exponentialRampToValueAtTime(0.0001, c.currentTime + d);
+        o.connect(g); g.connect(c.destination);
+        o.start(); o.stop(c.currentTime + d + .02);
+      } catch (e) {}
+    }
+    return {
+      on: function () { return on; },
+      toggle: function () { on = !on; return on; },
+      jump: function () { t(400, .1, 'square', .04, 620); },
+      land: function () { t(140, .06, 'sine', .045, 80); },
+      freeze: function () { t(760, .09, 'sine', .03, 300); },
+      thaw: function () { t(300, .07, 'sine', .025, 700); },
+      hurt: function () { t(220, .22, 'sawtooth', .07, 60); },
+      kill: function () { t(180, .14, 'square', .05, 90); },
+      pulse: function () { t(90, .3, 'sawtooth', .08, 700); },
+      tick: function () { t(1180, .035, 'square', .035); },
+      pick: function () { t(880, .09, 'triangle', .06, 1320); },
+      wave: function () { [440, 587, 740].forEach(function (f, i) { setTimeout(function () { t(f, .18, 'triangle', .05); }, i * 95); }); },
+      over: function () { [400, 320, 240, 160].forEach(function (f, i) { setTimeout(function () { t(f, .3, 'sawtooth', .06); }, i * 150); }); },
+      secret: function () { [660, 990, 1320].forEach(function (f, i) { setTimeout(function () { t(f, .15, 'triangle', .05); }, i * 80); }); },
+      ui: function () { t(620, .04, 'sine', .03); }
+    };
+  })();
+
+  // ══════════════════════════════════════════════════════════════
+  //  2c · 程序化音乐
+  //      整条音乐挂在一个低通滤波器上，截止频率跟着「攥住数量」走。
+  //      攥得越多，世界越闷；松手，声音才重新打开。
+  //      —— 这是机制的声音化身，不是背景装饰。
+  // ══════════════════════════════════════════════════════════════
+  var Music = (function () {
+    var bus = null, filt = null, timer = null, step = 0, nextT = 0;
+    var started = false, lastHold = 0;
+    var BASE = 57;                                   // A3
+    // i - VII - VI - V：下行哀歌低音，克制、下沉
+    var PROG = [[0, 3, 7], [-2, 2, 5], [-4, 0, 3], [-5, -1, 2]];
+    function mf(s) { return 440 * Math.pow(2, (s - 69) / 12); }
+
+    function ensure() {
+      var c = Audio.ctx(); if (!c) return false;
+      if (bus) return true;
+      try {
+        bus = c.createGain(); bus.gain.value = 0.0001;
+        filt = c.createBiquadFilter();
+        filt.type = 'lowpass'; filt.Q.value = 0.85;
+        filt.frequency.value = 2400;
+        bus.connect(filt); filt.connect(c.destination);
+        bus.gain.setValueAtTime(0.0001, c.currentTime);
+        bus.gain.linearRampToValueAtTime(0.24, c.currentTime + 2.2);
+        nextT = c.currentTime + 0.12;
+      } catch (e) { bus = null; filt = null; return false; }
+      return true;
+    }
+    function pad(f, t, dur, vol) {
+      var c = Audio.ctx(); if (!c || !bus) return;
+      try {
+        var o = c.createOscillator(), g = c.createGain();
+        o.type = 'sine'; o.frequency.value = f;
+        g.gain.setValueAtTime(0.0001, t);
+        g.gain.linearRampToValueAtTime(vol, t + dur * .35);
+        g.gain.linearRampToValueAtTime(0.0001, t + dur);
+        o.connect(g); g.connect(bus); o.start(t); o.stop(t + dur + .05);
+      } catch (e) {}
+    }
+    function pluck(f, t, vol) {
+      var c = Audio.ctx(); if (!c || !bus) return;
+      try {
+        var o = c.createOscillator(), g = c.createGain();
+        o.type = 'triangle'; o.frequency.value = f;
+        g.gain.setValueAtTime(vol, t);
+        g.gain.exponentialRampToValueAtTime(0.0001, t + .38);
+        o.connect(g); g.connect(bus); o.start(t); o.stop(t + .42);
+      } catch (e) {}
+    }
+    function play(st, t) {
+      var bar = Math.floor(st / 16) % 4, pos = st % 16, ch = PROG[bar];
+      if (pos === 0) {
+        for (var i = 0; i < ch.length; i++) pad(mf(BASE + ch[i] - 12), t, 2.9, .042);
+        pad(mf(BASE + ch[0] - 24), t, 3.2, .075);          // 低音
+      }
+      if (pos === 2 || pos === 6) pluck(mf(BASE + ch[pos === 2 ? 0 : 2] + 12), t, .05);
+      if (pos === 11) pluck(mf(BASE + ch[1] + 24), t, .032);
+    }
+    function schedule() {
+      var c = Audio.ctx(); if (!c || !bus) return;
+      if (!Sound.on()) { nextT = c.currentTime + .12; return; }
+      var eighth = 60 / 74 / 2;
+      var guard = 0;
+      while (nextT < c.currentTime + .5 && guard++ < 32) {
+        play(step, nextT);
+        step = (step + 1) % 64;
+        nextT += eighth;
+      }
+      if (nextT < c.currentTime) nextT = c.currentTime + .05;
+    }
+    return {
+      start: function () {
+        if (started || !ensure()) return;
+        started = true;
+        schedule();
+        timer = setInterval(schedule, 180);
+      },
+      stop: function () { if (timer) { clearInterval(timer); timer = null; } started = false; },
+      // hold: 当前攥住的数量。0 表示空手 —— 声音最开阔
+      update: function (hold) {
+        if (hold === lastHold) return;
+        lastHold = hold;
+        if (!filt) return;
+        var c = Audio.ctx(); if (!c) return;
+        var t01 = Math.min(1, hold / 6);
+        var cut = 2600 * Math.pow(0.15, t01);            // 2600Hz → 390Hz
+        try { filt.frequency.setTargetAtTime(cut, c.currentTime, 0.32); }
+        catch (e) { filt.frequency.value = cut; }
+      },
+      level: function () { return lastHold; }
+    };
+  })();
+
+  // ══════════════════════════════════════════════════════════════
+  //  3 · 存档
+  // ══════════════════════════════════════════════════════════════
+  var Save = (function () {
+    var K = 'still.save.v1', mem = null;
+    function read() {
+      if (mem) return mem;
+      mem = { unlocked: 1, bestKill: 0, ach: [], plays: 0, totalKill: 0,
+              reachedFinale: false, cleared: false, deaths: 0, coins: 0, owned: [], tut: 0 };
+      try {
+        var r = window.localStorage.getItem(K);
+        if (r) { var p = JSON.parse(r); if (p && typeof p === 'object') for (var k in mem) if (p[k] !== undefined) mem[k] = p[k]; }
+      } catch (e) {}
+      // mem：unlocked 已解锁章数 · ach 成就 · plays 开局次数 · totalKill 累计击杀
+      //      reachedFinale 到过终章 · cleared 通关 · bestKill 单章最高击杀
+      return mem;
+    }
+    // localStorage 是【同步写盘】。原来每杀一只怪就写一次 ——
+    // 无尽模式里十只怪同时死，就是几帧之内十次同步磁盘写入，
+    // 在低配机上正是一次肉眼可见的卡顿。
+    // 现在改成「先记着，过一会儿再落盘」：金币晚 1.5 秒存不会有人发现，卡顿会。
+    var pending = 0;
+    function flush() { pending = 0; try { window.localStorage.setItem(K, JSON.stringify(mem)); } catch (e) {} }
+    function later() { pending = 90; }
+    function tick() { if (pending > 0 && --pending === 0) flush(); }
+    return { get: read, flush: flush, later: later, tick: tick };
+  })();
+
+  // ══════════════════════════════════════════════════════════════
+  //  4 · 成就
+  // ══════════════════════════════════════════════════════════════
+  // 章数会变（9 → 12 就把界面上三处「九章」全写死了）。以后一律用它算。
+  var CN_D = ['零', '一', '二', '三', '四', '五', '六', '七', '八', '九'];
+  function cnNum(n) {
+    if (n <= 10) return CN_D[n];
+    if (n < 20) return '十' + CN_D[n - 10];
+    var t = Math.floor(n / 10), o = n % 10;
+    return CN_D[t] + '十' + (o ? CN_D[o] : '');
+  }
+  var ACHS = [
+    { id: 'first',  n: '第一次结冰', d: '钉住你的第一个敌人' },
+    { id: 'wall8',  n: '一堵墙',     d: '同一时刻钉住 8 个' },
+    { id: 'squeeze',n: '攥紧',       d: '把时间场压到最小还活着' },
+    { id: 'spike',  n: '硬碰硬',     d: '用脉冲砸碎一个「不化」' },
+    { id: 'pulse4', n: '一锅端',     d: '一次脉冲干掉 4 个' },
+    { id: 'ch5',    n: '过半',       d: '走到第 6 章' },
+    { id: 'ch9',    n: '到最后',     d: '走到第 12 章' },
+    { id: 'ending', n: '空着手',     d: '在终章走出那扇门' },
+    { id: 'boss',   n: '它闭眼了',   d: '砸碎那只眼睛' },
+    { id: 'nohold', n: '一次都没攥', d: '终章全程一次都没攥住东西' },
+    { id: 'k100',   n: '一百条命',   d: '累计击杀 100 个' },
+    { id: 'cat',    n: '猫',         d: '时间场里跑过去一只猫' },
+    { id: 'konami', n: '上上下下',   d: '你懂的' },
+    { id: 'full',   n: '全成就',     d: '以上全部点亮' }
+  ];
+  var ACH = {};
+  (function () { var s = Save.get(); for (var i = 0; i < ACHS.length; i++) ACH[ACHS[i].id] = s.ach.indexOf(ACHS[i].id) >= 0; })();
+  var achQ = [];
+  function unlock(id) {
+    if (ACH[id]) return false;
+    ACH[id] = true;
+    var s = Save.get();
+    if (s.ach.indexOf(id) < 0) s.ach.push(id);
+    Save.flush();
+    var d = null;
+    for (var i = 0; i < ACHS.length; i++) if (ACHS[i].id === id) d = ACHS[i];
+    if (d) achQ.push({ t: 0, n: d.n, d: d.d });
+    Sound.secret();
+    if (id !== 'full') {
+      var all = true;
+      for (var j = 0; j < ACHS.length; j++) if (ACHS[j].id !== 'full' && !ACH[ACHS[j].id]) { all = false; break; }
+      if (all) setTimeout(function () { unlock('full'); }, 800);
+    }
+    return true;
+  }
+  function achCount() { var c = 0; for (var i = 0; i < ACHS.length; i++) if (ACH[ACHS[i].id]) c++; return c; }
+
+  var Eggs = {
+    rainbow: false, cat: null, konamiBuf: [], typed: '',
+    glitch: 0, msg: null, msgT: 0
+  };
+  var KONAMI = ['ArrowUp', 'ArrowUp', 'ArrowDown', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'ArrowLeft', 'ArrowRight', 'b', 'a'];
+
+  // ══════════════════════════════════════════════════════════════
+  //  5 · 敌人类型
+  //  —— 所有敌人都是矩形：冻住之后要能站上去
+  // ══════════════════════════════════════════════════════════════
+  // 速度全部高于玩家（4.9）—— 打不过就跑不掉，只能打。
+  // 这才是一场赛跑：在它咬到你之前把它烧死。
+  var TYPES = {
+    crawler: { hp: 3, w: 28, h: 26, sp: 5.30, fly: false, hue: 12,  cost: 1, nm: '爬虫' },
+    floater: { hp: 2, w: 26, h: 26, sp: 4.70, fly: true,  hue: 275, cost: 1, nm: '飘浮' },
+    charger: { hp: 5, w: 36, h: 32, sp: 2.45, fly: false, hue: 40,  cost: 3, nm: '冲撞' },
+    shooter: { hp: 3, w: 26, h: 26, sp: 3.10, fly: true,  hue: 330, cost: 2, nm: '射手', shoot: 104 },
+    // 「不化」钉不住也烧不掉，只能吃脉冲；比你慢，但永远不会停
+    spike:   { hp: 6, w: 28, h: 28, sp: 2.35, fly: false, hue: 0, cost: 4, nm: '不化', noFreeze: true },
+    // 第 13 章那只巨物的眼睛。做成敌人是有意的 —— 这样「圈能钉住它、能烧它、
+    // 脉冲能砸它」全部自动成立，一行特殊判定都不用写。
+    // hp 就是 boss 的血量；收回去的那些时间里它是无敌的（e.shield）。
+    core:    { hp: 72, w: 58, h: 58, sp: 0, fly: true, hue: 350, cost: 0, nm: '弱核', boss: true }
+  };
+  var BULLET_SP = 7.0;
+
+  // ══════════════════════════════════════════════════════════════
+  //  武器
+  // ══════════════════════════════════════════════════════════════
+  // 每把武器改的是同一组东西：圈多大、灼烧多快、脉冲多狠、能不能钉「不化」。
+  // 「不化」默认钉不住（它的存在意义就是逼你换手段）—— 狙击镜是唯一能按住它的东西。
+  // 三个开关各管一件事，别混：
+  //   canHold    能不能攥住（攥住才会让圈缩小、让你变慢）
+  //   burnField  圈里烧不烧
+  //   spikeKill  这把武器的脉冲砸不砸得动「不化」（「不化」只吃脉冲，灼烧一律无效）
+  // 「不化」6 血：时间场 pdmg 3 → 两下，狙击镜 pdmg 9 → 一下，撒手砸不动。
+  //
+  // 狙击镜是纯脉冲武器：不攥、不烧，圈就是脉冲的范围，所见即所得。
+  var WEAPONS = [
+    { id: 'field', n: '时间场', price: 0,
+      d: '标准圈，范围最舒服。脉冲砸两下能碎一个「不化」。',
+      rMul: 1.00, dmgMul: 1,   cd: 78,  pdmg: 3, rPulse: 1.28,
+      canHold: true,  burnField: true,  spikeKill: true },
+    { id: 'scope', n: '狙击镜', price: 30,
+      d: '只有脉冲：不攥、不烧，圈画多大就能打多远。冷却短，脉冲一下砸碎「不化」，圈里其他敌人也基本一击毙命。',
+      rMul: 0.46, dmgMul: 1,   cd: 170, pdmg: 9, rPulse: 0.46,
+      canHold: false, burnField: false, spikeKill: true },
+    { id: 'letgo', n: '撒手',   price: 45,
+      d: '圈特别大、永远不缩、永远跑得最快。攥不住任何东西，只有灼烧，而且脉冲砸不动「不化」。',
+      rMul: 1.55, dmgMul: 0.9, cd: 110, pdmg: 3, rPulse: 1.50,
+      canHold: false, burnField: true,  spikeKill: false }
+  ];
+  function WEP() { return WEAPONS[S.weapon] || WEAPONS[0]; }
+  // 现在跑的是不是自制关（试玩 / 我的关卡里点「玩」都算）
+  function customRun() { var C = CHAPTERS[S.chapter]; return !!(C && C.__custom); }
+
+  function owns(i) {
+    // 自制关里三把武器全开。
+    // 别人的关可能整关都是「不化」（不吃脉冲就没法打），
+    // 或者整个设计就靠「撒手」那个永远不缩的大圈 ——
+    // 粘码的人手里要是没有那把，这关就白做了。作者自己也试不全三把。
+    if (customRun()) return true;
+    var o = Save.get().owned || [];
+    return i === 0 || o.indexOf(WEAPONS[i].id) >= 0;
+  }
+
+  // ══════════════════════════════════════════════════════════════
+  //  能力渐进解锁
+  // ══════════════════════════════════════════════════════════════
+  // 第 1 关只有那个圈，脉冲第 2 关才教，下跳第 3 关才教。
+  // 注意：是「按章节序号给能力」，不是「锁章节」—— 直接从第 8 关开始，
+  // 到第 8 关为止该有的能力一样都不少。「本喵不锁门」这条不变。
+  var ABILITY_AT = { move: 1, jump: 1, field: 1, pulse: 2, drop: 3 };
+  function has(k) { return (ABILITY_AT[k] || 1) <= S.chapter + 1; }
+
+  // ══════════════════════════════════════════════════════════════
+  //  5b · 九章
+  //      每一章只教一件事，然后往下压。终章把机制翻过来用。
+  // ══════════════════════════════════════════════════════════════
+  var CHAPTERS = [
+    { n: '醒', sel: '它们都醒着，也都比你快', sub: '这一关只有那个圈。\n鼠标划出的圆 —— 圈里的会被钉住，也会被烧掉。\n（还没有脉冲，也用不着）',
+      types: ['crawler'], need: 3, gap: 140, maxAlive: 3 },
+    { n: '多', sel: '你攥得越多，圈就越小', sub: '来了更多。\n注意你的圈 —— 你每按住一个，它就小一圈。\n（右键：脉冲。圈里一次爆发，能救命）',
+      types: ['crawler', 'crawler', 'floater'], need: 7, gap: 108, maxAlive: 5,
+      plats: [[600, 462, 200, 18]] },
+    { n: '台', sel: '高处它们上不来，你也够不着', sub: '站得高，它们爬不上来。\n但你的圈也够不到地面 —— 想推进，就得下来。\n（按 S 或 ↓ 可以直接从台上跳下去）',
+      types: ['crawler', 'floater'], need: 6, gap: 92,
+      plats: [[180, 462, 170, 18], [420, 377, 170, 18], [660, 292, 170, 18]],
+      items: [['shield', 505, 340]] },
+    { n: '远', sel: '子弹不受你的圈影响', sub: '射手不靠近，它射出来的东西也不受你的圈影响。\n那是已经发生的事，你按不住。',
+      types: ['crawler', 'floater', 'shooter'], need: 9, gap: 84,
+      plats: [[120, 432, 150, 18], [770, 432, 150, 18]] },
+    { n: '拾', sel: '地上的东西，走过去就吃到', sub: '青色的替你挡一次伤害。\n紫色的让脉冲立刻好。\n金色的给你六秒 —— 攥住不算数。',
+      types: ['crawler', 'floater', 'shooter'], need: 7, gap: 88,
+      plats: [[300, 442, 180, 18], [560, 442, 180, 18]],
+      items: [['shield', 390, 405], ['pulse', 650, 405], ['breathe', 830, 505]] },
+    { n: '硬', sel: '「不化」钉不住，只能砸', sub: '「不化」钉不住，也烧不掉。\n它只能被脉冲砸碎。',
+      types: ['crawler', 'crawler', 'shooter', 'spike'], need: 8, gap: 80,
+      items: [['pulse', 480, 500]] },
+    { n: '独', sel: '这一关只有「不化」', sub: '这一关只有「不化」。\n你的圈对它们毫无意义。',
+      types: ['spike'], need: 5, gap: 124,
+      plats: [[400, 432, 160, 18]],
+      items: [['pulse', 480, 395]] },
+    { n: '撞', sel: '看到地上那条线就跳', sub: '冲撞者会先蓄力，地上会亮起一条线。\n看到线就跳。',
+      types: ['crawler', 'floater', 'charger'], need: 11, gap: 76,
+      plats: [[140, 442, 160, 18], [660, 442, 160, 18]] },
+    { n: '挤', sel: '你能站的地方越来越小', sub: '全都会来。\n你能站的地方越来越小。\n不用杀光它们 —— 撑住 24 秒就行。',
+      types: ['crawler', 'floater', 'shooter', 'charger', 'spike'], need: 24, gap: 76, maxAlive: 7, win: 'survive',
+      plats: [[240, 452, 150, 18], [560, 362, 150, 18], [800, 452, 140, 18]],
+      items: [['breathe', 635, 327]] },
+    { n: '崖', sel: '路是竖着的，爬上去要空出手', sub: '这一层没几只会来，但路是竖着的。\n不用杀光 —— 爬到最上面那层就算过。\n难的是上去的时候，手里还攥着东西。',
+      types: ['floater', 'shooter', 'crawler', 'charger'], need: 6, gap: 78, win: 'reach', goalQuiet: true, goal: [340, 86, 160, 34],
+      plats: [[340, 462, 160, 18], [460, 377, 160, 18], [340, 292, 160, 18], [460, 207, 160, 18], [340, 122, 160, 18]],
+      items: [['shield', 420, 87], ['breathe', 880, 505]] },
+    { n: '潮', sel: '别贪', sub: '别贪。\n一次攥五个的人，活不过这一章。',
+      types: ['crawler', 'crawler', 'floater', 'shooter', 'charger', 'spike'], need: 14, gap: 58,
+      plats: [[200, 452, 140, 18], [760, 452, 140, 18]],
+      items: [['breathe', 480, 500], ['pulse', 880, 500]] },
+    { n: '放手', sel: '门只在空手时开', sub: '门只会为你敞开一次。\n在你空着手的时候。',
+      types: ['crawler', 'floater', 'shooter', 'charger'], need: 0, gap: 100, maxAlive: 6, finale: true,
+      plats: [[310, 442, 150, 18], [620, 442, 150, 18]],
+      items: [['shield', 385, 405]] }
+  ,
+    { n: '巨', sel: '它一直在那儿', win: 'boss',
+      sub: '原来门后面还有东西。\n它的眼睛会落下来 —— 那几秒里你才伤得到它。\n（小怪不用清光，你只要那只眼睛）',
+      types: ['crawler'], need: 0, gap: 140, maxAlive: 4,
+      plats: [[140, 430, 150, 18], [400, 356, 160, 18], [670, 430, 150, 18]] },
+    // 「无限」不是第 14 关，是另一回事：没有终点、没有目标，只有一波接一波。
+    // 这个游戏的主题是「你能攥住的有限」，那它的反面就是「敌人无限」。
+    { n: '无限', sel: '没有终点', infinite: true, win: 'infinite',
+      sub: '没有终点，也没有目标。\n它们不会停，你的圈会越攥越小。\n撑到你撑不住为止。',
+      types: ['crawler'], need: 0, gap: 150, maxAlive: 3,
+      plats: [[140, 430, 150, 18], [400, 356, 160, 18], [670, 430, 150, 18]] }]
+
+  // 必须放在 CHAPTERS 之后 —— 原来写在 ACHS 前面，那里 CHAPTERS 还没定义，直接炸
+  // 无限那张不是「一章」，所以报数的时候要把它剔掉
+  var REAL_N = CHAPTERS.filter(function (c) { return !c.infinite; }).length;   // 工坊搬去首页后，章节表只剩「章 + 无限」
+  var CN_CHAPTERS = cnNum(REAL_N);                   // 13 → 「十三」;
+
+  // ══════════════════════════════════════════════════════════════
+  //  6 · 状态
+  // ══════════════════════════════════════════════════════════════
+  var S = {
+    mode: 'title',            // title | select | workshop | shop | intro | play | pause | clear | over | ending
+    t: 0,
+    hp: MAX_HP, invuln: 0,
+    ch: null,
+    enemies: [], bullets: [], parts: [], floats: [],
+    plats: [], items: [], shield: 0, breathe: 0,
+    field: { x: W / 2, y: 300, r: R_BASE, pl: 0, hold: 0 },
+    mouse: { x: W / 2, y: 300, down: false },
+    pulse: { cd: 0, fx: 0 },
+    maxHp: MAX_HP,
+    fails: 0, failsFor: -1, mercy: 0,
+    worldFrozen: false, freezeFx: 0, theme: 0,
+    chapter: 0, chapterKilled: 0, chapterNeed: 0, chapterBreak: 0, chapterDone: false,
+    chapterT: 0, goal: null, goalHit: false,
+    weapon: 0, coins: 0, shopIdx: 0, tutT: 0,
+    boss: null, bossCore: null, warns: [], wave: 1, waveT: 0, breath: false,
+    showFps: false, _ft: [], _last: 0,
+    // 工坊（关卡编辑器）。整关就是一张数据表，所以「做关卡」这件事本身
+    // 就是让玩家直接去写那张表 —— 打开来给他们。
+    edit: null, testing: false, editList: false,
+    spawnT: 0, door: null,
+    kills: 0, runKills: 0, runT: 0, deaths: 0,
+    shake: 0, flash: 0, hitstop: 0, pulseKills: 0,
+    introT: 0, clearT: 0, endingT: 0, selT: 0, selIdx: 0, pauseT: 0,
+    over: 0,
+    banner: null, bannerT: 0,
+    bootT: 0
+  };
+
+  // ══════════════════════════════════════════════════════════════
+  //  7 · 生成
+  // ══════════════════════════════════════════════════════════════
+  var ENEMY_WAVE_MARK = 0;
+
+  function makeEnemy(type, x, y, wave) {
+    var T = TYPES[type];
+    var e = {
+      type: type, T: T,
+      x: x, y: y, w: T.w, h: T.h,
+      vx: 0, vy: 0,
+      hp: T.hp, maxhp: T.hp,
+      live: true, frozen: 0, statueT: 0,
+      face: 1, bob: rnd(0, 6.28), flash: 0,
+      shootT: T.shoot ? Math.floor(T.shoot * rnd(.4, 1)) : 0,
+      chargeT: 0, chargeState: 0, dead: false, wave: wave,
+      spawnFx: 16
+    };
+    return e;
+  }
+
+  function spawnPoint() {
+    var side = Math.random();
+    if (side < 0.42) return { x: -40, y: rnd(CEIL + 40, FLOOR - 40) };
+    if (side < 0.84) return { x: W + 40, y: rnd(CEIL + 40, FLOOR - 40) };
+    return { x: rnd(80, W - 80), y: CEIL - 30 };
+  }
+
+  function CHAPTER() { return CHAPTERS[clamp(S.chapter, 0, CHAPTERS.length - 1)]; }
+  function isFinale() { return !!(CHAPTER() && CHAPTER().finale); }
+
+  function banner(s, c) { S.banner = { s: s, c: c || PAL.ink }; S.bannerT = 110; }
+
+  // ── 道具 ──
+  var ITEMS = {
+    shield:  { n: '护盾',     c: '#6be3ff', d: '替你挡一次' },
+    pulse:   { n: '脉冲核心', c: '#a98bff', d: '脉冲立刻充能' },
+    breathe: { n: '喘息',     c: '#ffd166', d: '六秒内攥住不缩圈、不减速' },
+    heart:   { n: '心',       c: '#ff5f7e', d: '回一颗心' }
+  };
+  var BREATHE_TIME = 360;
+
+  // ── 随机掉落 ──
+  // 击杀是这游戏里唯一必须「攥住」的动作，也就是唯一要付代价的动作。
+  // 让它有概率掉东西，「打」和「跑」才真的成为一个选择 ——
+  // 不然空手跑得最快、还不用冒险，跑永远更划算。
+  //
+  // 喘息最稀有：它是唯一能让你「攥住不用付代价」的东西，给多了规则就废了。
+  var DROP_CHANCE = .17;
+  function rollDrop(x, y) {
+    var C = CHAPTER();
+    var bossCh = !!(C && C.win === 'boss');
+    // 打 boss 的时候护盾最值钱（它替你挡一次弹幕），所以那一章掉得多、而且几乎只掉它
+    var chance = bossCh ? .45 : DROP_CHANCE;
+    if (Math.random() >= chance) return;
+    var r = Math.random();
+    var t = bossCh ? (r < .82 ? 'shield' : 'pulse')
+                   : (r < .44 ? 'shield' : (r < .84 ? 'pulse' : 'breathe'));
+    S.items.push({ t: t, x: x, y: y, got: false, ph: 0, drop: true, vy: -3.2, cool: 18, landed: false });
+    var def = ITEMS[t];
+    S.floats.push({ s: def.n, x: x, y: y - 20, t: 46, c: def.c });
+  }
+
+  // 掉出来的会先弹一下再落地。落点算上跳台 —— 高处的敌人掉的东西落在台上，是合理的奖励。
+  function updateItems() {
+    for (var i = 0; i < S.items.length; i++) {
+      var it = S.items[i];
+      if (!it.drop || it.got) continue;
+      if (it.cool > 0) it.cool--;
+      if (it.landed) continue;
+      var prevY = it.y;
+      it.vy = Math.min(it.vy + GRAV * .5, 8);
+      it.y += it.vy;
+      if (it.vy <= 0) continue;
+      var boxes = solidBoxes();
+      for (var b = 0; b < boxes.length; b++) {
+        var bx = boxes[b];
+        if (it.x < bx.x || it.x > bx.x + bx.w) continue;
+        if (prevY <= bx.y && it.y >= bx.y) { it.y = bx.y - 13; it.landed = true; it.vy = 0; break; }
+      }
+      if (it.y > H + 40) { it.y = FLOOR - 13; it.landed = true; it.vy = 0; }
+    }
+  }
+
+  // ── 第一次玩的教学 ──
+  // 粉丝原话：「有点玩不懂，不知道怎么杀」。
+  // 章节卡上写一遍是不够的 —— 要在【那一刻】把字摆在屏幕上。
+  // 进度存进存档，学会了就再也不出现（跳到哪一章都教，不锁门那条不破）。
+  function tutStage() { return Save.get().tut || 0; }
+  function tutSet(n) {
+    var sv = Save.get();
+    if ((sv.tut || 0) < n) {
+      sv.tut = n;
+      // 走到最后一步时把倒计时归零 —— S.tutT 是全局的，不归零的话
+      // 可能「刚学会怎么杀」就被立刻收走，玩家一眼都没看清
+      if (n === 2) S.tutT = 0;
+      Save.flush();
+    }
+  }
+  function tutLine() {
+    var t = tutStage();
+    if (t === 0) return '把鼠标移到敌人身上 —— 圈里的会被钉住，然后烧掉';
+    if (t === 1) return '就这样，把圈摁在它身上别松手';
+    if (t === 2) return '这就是杀敌　·　空着手时你跑得最快，攥着东西会变慢';
+    return '';
+  }
+
+  // ── 第 13 章那只巨物 ──
+  // 设计要点：它本体一直在背景里，圈够不着。**只有眼睛落进场内的那几秒你才伤得到它。**
+  // 于是每个窗口都逼你在同一时刻做同一个老决策：圈是继续压着小怪，还是挪过去按住眼睛？
+  // 挪过去，小怪就活了 —— 这就是主题在 boss 战里的重演。
+  var CORE_ANCHORS = [[215, 352], [480, 288], [745, 352]];   // 左台 / 中台 / 右台 上方
+
+  function updateBoss() {
+    var b = S.boss, core = S.bossCore;
+    if (!b || b.dead || !core) return;
+    b.t++;
+    if (b.flash > 0) b.flash--;
+    b.phase = b.hp > b.maxhp * .66 ? 1 : (b.hp > b.maxhp * .33 ? 2 : 3);
+
+    // 窗口节奏：越到后面落得越勤、停得越短
+    if (b.up) {
+      b.upT--;
+      if (b.upT <= 0) { b.up = false; b.restT = b.phase === 3 ? 300 : 400; Sound.thaw(); }
+    } else {
+      b.restT--;
+      if (b.restT <= 0) {
+        b.up = true; b.upT = b.phase === 1 ? 300 : 250;
+        var a = CORE_ANCHORS[Math.floor(Math.random() * CORE_ANCHORS.length)];
+        b.tx = a[0]; b.ty = a[1];
+        banner('它睁开了', PAL.red); Sound.wave();
+      }
+    }
+    var gx = b.up ? b.tx : W / 2, gy = b.up ? b.ty : 146;
+    b.cx = lerp(b.cx, gx, .10); b.cy = lerp(b.cy, gy, .10);
+    core.x = b.cx - core.w / 2; core.y = b.cy - core.h / 2;
+    core.shield = !b.up;                  // 收在本体里的时候打不动
+    // 保险：眼睛是放在敌人数组里的，万一别处把数组清空了（比如通关定格），把它放回去
+    if (S.enemies.indexOf(core) < 0 && !core.dead) S.enemies.push(core);
+    b.hp = core.hp;   // 方向不能反：伤害是打在眼睛上的，boss 的血跟着眼睛走
+    if (b.up) core.spawnFx = 0;
+
+    // 扇形弹幕：从眼睛【当前的位置】射出来 —— 眼睛落进场内时最危险
+    b.fireT--;
+    if (b.fireT <= 0) {
+      b.fireT = b.phase === 1 ? 152 : (b.phase === 2 ? 120 : 98);
+      var n = b.phase === 1 ? 5 : (b.phase === 2 ? 7 : 9);
+      var base = Math.atan2(S.ch.y + 13 - b.cy, S.ch.x + 9 - b.cx);
+      for (var i = 0; i < n; i++) {
+        var ang = base + (i - (n - 1) / 2) * .23;
+        S.bullets.push({ x: b.cx, y: b.cy, vx: Math.cos(ang) * 4.4, vy: Math.sin(ang) * 4.4,
+                         r: 6, live: true, life: 420, t: 0 });
+      }
+      Sound.pulse();
+    }
+
+    // 落石：先画一条预警柱，再砸
+    b.rockT--;
+    if (b.rockT <= 0) {
+      b.rockT = b.phase === 1 ? 330 : (b.phase === 2 ? 255 : 195);
+      S.warns.push({ x: 100 + Math.random() * (W - 200), t: 48, max: 48 });
+    }
+  }
+
+  function updateWarns() {
+    for (var i = S.warns.length - 1; i >= 0; i--) {
+      var w = S.warns[i];
+      w.t--;
+      if (w.t <= 0) {
+        S.bullets.push({ x: w.x, y: CEIL + 10, vx: 0, vy: 8.6, r: 12, live: true, life: 200, t: 0 });
+        S.warns.splice(i, 1);
+      }
+    }
+  }
+
+  function bossDown() {
+    var b = S.boss;
+    if (!b || b.dead) return;
+    b.dead = true; b.up = false;
+    if (S.bossCore) S.bossCore.dead = true;
+    S.warns = []; S.bullets = [];
+    if (CHAPTER().infinite) {
+      // 无限里它只是插曲 —— 杀掉继续打波，不是通关
+      S.floats.push({ s: '它倒下了', x: W / 2, y: 150, t: 110, c: PAL.gold });
+      S.boss = null; S.bossCore = null;
+      S.waveT = BREATH_FRAMES; S.breath = true;    // 给口气
+      Sound.wave();
+      return;
+    }
+    var sv = Save.get(); sv.bossDown = true; Save.flush();
+    unlock('boss');
+    chapterClear();
+  }
+
+  // ── 无限：一波接一波 ──
+  // 每波固定时长，到点就加码：种类变多、出怪变快、同屏变多。上限压在 11 只 ——
+  // 不是要它「不可战胜」，是要它「迟早撑不住」。
+  var WAVE_FRAMES = 900;                       // 15 秒一波
+  var BREATH_FRAMES = 240;                     // 然后喘 4 秒 —— 不出新怪，但老怪还在
+  var INF_POOL = ['crawler', 'floater', 'shooter', 'charger', 'spike'];
+  function infSetupWave(w) {
+    var C = CHAPTER();
+    var n = Math.min(INF_POOL.length, 1 + Math.floor(w / 2));
+    C.types = INF_POOL.slice(0, n);
+    if (w >= 3) C.types = C.types.concat(['crawler']);     // 爬虫始终是主力
+    C.gap = Math.max(32, 150 - (w - 1) * 9);
+    C.maxAlive = Math.min(11, 3 + Math.floor(w / 2));
+  }
+  // 无限模式的 boss：每 5 波来一次，第 N 次出现时血量是基准的 N/8 ——
+  // 1/8 → 2/8 → 3/8 …… 越往后越肉。
+  // （原来每 15 波一次、按 N/4 涨。来得密了三倍，涨速就放慢三倍，两边抵消。）
+  function spawnInfBoss(nth) {
+    var hp = Math.max(5, Math.round(TYPES.core.hp * nth / 8));
+    S.boss = { hp: hp, maxhp: hp, phase: 1, t: 0,
+               up: false, upT: 0, restT: 150, cx: W / 2, cy: 146, tx: W / 2, ty: 146,
+               fireT: 150, rockT: 320, dead: false, flash: 0 };
+    S.bossCore = makeEnemy('core', W / 2 - 29, 146 - 29, S.chapter);
+    S.bossCore.hp = hp; S.bossCore.maxhp = hp;
+    S.bossCore.shield = true;
+    S.enemies.push(S.bossCore);
+    banner('它来了 · 第 ' + nth + ' 次', PAL.red);
+    S.waveT = 99999;                 // boss 战期间不打波次
+    S.breath = false;
+    Sound.wave();
+  }
+
+  function updateWaves() {
+    if (S.boss) return;              // boss 没死就不进下一波
+    if (winKind() !== 'infinite' || S.chapterDone) return;
+    S.waveT--;
+    if (S.waveT > 0) return;
+    // 喘息结束 → 下一波开始
+    if (S.breath) {
+      S.breath = false;
+      S.wave++;
+      S.waveT = WAVE_FRAMES;
+      infSetupWave(S.wave);
+      banner('第 ' + S.wave + ' 波', S.wave % 5 === 0 ? PAL.red : PAL.cy);
+      Sound.wave();
+      return;
+    }
+    // 一波打完 → 喘 4 秒。老怪不清，你能趁这时候把场子收干净。
+    S.breath = true;
+    S.waveT = BREATH_FRAMES;
+    banner('喘口气', PAL.mint);
+    Sound.tick();
+    // 掉落：每 2 波回一颗心（满血就不掉，免得浪费），每 3 波一个护盾
+    if (S.wave % 2 === 0 && S.hp < (S.maxHp || MAX_HP)) {
+      S.items.push({ t: 'heart', x: S.ch.x + 9, y: S.ch.y - 10, got: false, ph: 0,
+                     drop: true, vy: -3, cool: 24, landed: false });
+      S.floats.push({ s: '心', x: S.ch.x + 9, y: S.ch.y - 40, t: 60, c: ITEMS.heart.c });
+    }
+    if (S.wave % 3 === 0) {
+      S.items.push({ t: 'shield', x: W / 2, y: 200, got: false, ph: 0,
+                     drop: true, vy: -3, cool: 24, landed: false });
+      S.floats.push({ s: '第 ' + S.wave + ' 波 · 护盾', x: W / 2, y: 170, t: 60, c: PAL.gold });
+    }
+    // 每 5 波：它来一次
+    if (S.wave % 5 === 0) spawnInfBoss(S.wave / 5);
+  }
+
+  // ── 工坊 ──
+  // 这个游戏的一切都是数据表（章节就是一行对象），所以「做关卡」= 直接编辑那张表。
+  // 做好的关能压成一段纯文本码，粘到聊天里就能传给下一个人 —— 不联网也能分享。
+  //
+  // 界面分两层：画布只放「用鼠标摆的东西」，所有「规矩」都收进一个面板。
+  // 理由：一堆控件糊在顶上，就是当初把粉丝劝退的那种界面。
+  var ITEM_ORDER = ['shield', 'pulse', 'breathe', 'heart'];
+  var EDIT_TYPES = ['crawler', 'floater', 'shooter', 'charger', 'spike'];
+  var TYPE_CN = { crawler: '爬虫', floater: '飘浮', shooter: '射手', charger: '冲撞', spike: '不化' };
+  var MAX_MINE = 8;
+  var WINS = [
+    { k: 'kill',    n: '杀够数',  hint: '把这关的怪杀够 N 个就算过' },
+    { k: 'survive', n: '撑够秒',  hint: '活够 N 秒就算过，杀不杀都行' },
+    { k: 'reach',   n: '爬上旗',  hint: '在场地里放一面旗，爬到那儿就算过' }
+  ];
+  var TPLS = [
+    { n: '空白',  plats: [], items: [] },
+    { n: '阶梯',  plats: [[60, 470, 220, 18], [330, 400, 180, 18], [600, 330, 170, 18], [790, 250, 150, 18]],
+                  items: [[1, 850, 225]] },
+    { n: '双台',  plats: [[150, 440, 190, 18], [570, 350, 210, 18]], items: [[0, 675, 322]] }
+  ];
+
+  // 自制关不排章节号 —— 它是临时挂在章节表尾巴上的，顶着「第 16 章」的名不像话
+  function chapNo() { return CHAPTER().__custom ? '试玩' : '第 ' + (S.chapter + 1) + ' 章'; }
+  function chapLabel() {
+    var C = CHAPTER();
+    if (C.__custom) return C.n || '自制';
+    if (C.infinite || C.workshop) return C.n;
+    return '第 ' + (S.chapter + 1) + ' 章 · ' + C.n;
+  }
+
+  // ── 分享码 ──
+  // 码画在 canvas 上是选不中的，而这个模块的命脉就是「把码发出去」。
+  // 所以展示时在画布上盖一个真的 <textarea>，自动全选，再顺手试一次写剪贴板。
+  var codeEl = null;
+  function wrapCode(code, per) {
+    var out = [], cur = '';
+    for (var i = 0; i < code.length; i++) {
+      cur += code.charAt(i);
+      var c = code.charAt(i);
+      if (cur.length >= per && (c === '|' || c === ';' || c === ',')) { out.push(cur); cur = ''; }
+    }
+    if (cur) out.push(cur);
+    return out;                          // 拼起来跟原码一字节不差，只是换行给人看
+  }
+  function showCodeEl(code) {
+    hideCodeEl();
+    try {
+      var ta = document.createElement('textarea');
+      ta.value = code;
+      ta.readOnly = true;
+      ta.spellcheck = false;
+      ta.style.cssText = 'position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);z-index:60;' +
+        'width:min(760px,80vw);height:64px;box-sizing:border-box;padding:10px 12px;' +
+        'font:600 14px/1.5 ui-monospace,Consolas,monospace;letter-spacing:.4px;text-align:center;' +
+        'color:#9fefff;background:rgba(9,24,38,.97);border:1px solid rgba(79,227,255,.55);' +
+        'border-radius:8px;resize:none;outline:none;';
+      document.body.appendChild(ta);
+      ta.focus(); ta.select();
+      codeEl = ta;
+    } catch (e) {}
+    try {
+      var pr = navigator.clipboard && navigator.clipboard.writeText && navigator.clipboard.writeText(code);
+      if (pr && pr.catch) pr.catch(function () {});   // file:// 下写剪贴板会被拒，无所谓，框里能选
+    } catch (e) {}
+  }
+  function hideCodeEl() {
+    try { if (codeEl && codeEl.parentNode) codeEl.parentNode.removeChild(codeEl); } catch (e) {}
+    codeEl = null;
+  }
+
+  // ── 我的关卡 ──
+  function mineList() {
+    var sv = Save.get();
+    if (typeof sv.mine === 'string') sv.mine = [{ n: '我的关卡', c: sv.mine }];  // 旧存档：一段码
+    if (!sv.mine || !sv.mine.length || !sv.mine.push) sv.mine = [];
+    return sv.mine;
+  }
+  function saveLevel(name) {
+    var L = mineList(), code = editEncode(S.edit);
+    for (var i = 0; i < L.length; i++) {
+      if (L[i].n === name) { L[i].c = code; Save.flush(); return 'over'; }
+    }
+    if (L.length >= MAX_MINE) return 'full';
+    L.push({ n: name, c: code });
+    Save.flush();
+    return 'ok';
+  }
+  function mineRows() {
+    var L = mineList(), out = [];
+    for (var i = 0; i < L.length; i++) {
+      var y = 148 + i * 48;
+      out.push({ i: i, n: L[i].n, x: 90, y: y, w: W - 180, h: 40,
+                 sub: (function (c) { var d = editDecode(c); return d ? winText(d) : ''; })(L[i].c),
+                 edit: [704, y + 8, 50, 24], play: [762, y + 8, 46, 24], del: [816, y + 8, 40, 24] });
+    }
+    return out;
+  }
+  function winText(e) {
+    var w = e.win || 'kill';
+    if (w === 'survive') return '撑住 ' + e.need + ' 秒';
+    if (w === 'reach')   return '爬上旗子' + (e.goalQuiet ? '（空手）' : '');
+    return '击杀 ' + e.need + ' 个';
+  }
+
+  // ── 关卡数据 ──
+  function freshEdit() {
+    return { plats: [[150, 440, 190, 18], [570, 350, 210, 18]],
+             types: [0], need: 6, gap: 88, maxAlive: 6,
+             items: [[0, 675, 322]], goal: [430, 150, 120, 60], goalQuiet: false,
+             win: 'kill', name: '', wep: 0,
+             tab: 0, item: 0, drag: null, slide: null, panel: false, undo: [],
+             code: '', showCode: false };
+    // 默认不是空白：两块高低错开的台子 + 一个护盾，进去按 Enter 立刻有得打。
+  }
+
+  function escName(s) { return String(s || '').replace(/[|;\n\r]/g, '').trim().slice(0, 12); }
+
+  function editEncode(e) {
+    var p = e.plats.map(function (q) { return q.join(','); }).join(';');
+    var i = e.items.map(function (q) { return q[0] + ',' + q[1] + ',' + q[2]; }).join(';');
+    var out = 'STILL2|n' + escName(e.name) +
+      '|p' + p + '|t' + e.types.join('') +
+      '|k' + e.need + '|g' + e.gap + '|m' + (e.maxAlive || 6) +
+      '|w' + String(e.win || 'kill').charAt(0) + '|x' + (e.wep || 0);
+    if (e.win === 'reach') out += '|q' + (e.goalQuiet ? 1 : 0) + '|o' + (e.goal || [430, 150, 120, 60]).join(',');
+    return out + '|i' + i;
+  }
+  function editDecode(s) {
+    try {
+      var seg = String(s).trim().split('|');
+      var v1 = seg[0] === 'STILL1', v2 = seg[0] === 'STILL2';
+      if (!v1 && !v2) return null;
+      var o = { plats: [], types: [0], need: 6, gap: 88, maxAlive: 6,
+                items: [], goal: [430, 150, 120, 60], goalQuiet: false,
+                win: 'kill', name: '', wep: 0,
+                tab: 0, item: 0, drag: null, slide: null, panel: false, undo: [],
+                code: '', showCode: false };
+      for (var si = 1; si < seg.length; si++) {
+        var tag = seg[si].charAt(0), body = seg[si].slice(1);
+        if (tag === 'n') { o.name = escName(body); continue; }
+        if (!body) continue;
+        if (tag === 'p') o.plats = body.split(';').map(function (t) {
+          var a = t.split(','); return [+a[0] || 0, +a[1] || 0, +a[2] || 0, +a[3] || 18];
+        }).filter(function (q) { return q[2] > 8; });
+        else if (tag === 't') o.types = body.split('').map(Number).filter(function (n) { return n >= 0 && n < 5; });
+        else if (tag === 'k') o.need = Math.max(1, Math.min(999, +body || 6));
+        else if (tag === 'g') o.gap = Math.max(24, Math.min(400, +body || 88));
+        else if (tag === 'm') o.maxAlive = Math.max(1, Math.min(9, +body || 6));
+        else if (tag === 'w') o.win = ({ k: 'kill', s: 'survive', r: 'reach' })[body] || 'kill';
+        else if (tag === 'x') o.wep = Math.max(0, Math.min(2, +body || 0));
+        else if (tag === 'q') o.goalQuiet = body === '1';
+        else if (tag === 'o') { var g = body.split(',').map(Number);
+          if (g.length === 4 && g[2] > 8) o.goal = [+g[0] || 0, +g[1] || 0, +g[2] || 0, +g[3] || 0]; }
+        else if (tag === 'i') o.items = body.split(';').map(function (t) {
+          var a = t.split(','); return [+a[0] || 0, +a[1] || 0, +a[2] || 0];
+        }).filter(function (q) { return q[0] >= 0 && q[0] < 4; });
+      }
+      if (!o.types.length) o.types = [0];
+      if (o.win === 'survive') o.need = Math.max(5, Math.min(120, o.need));
+      else if (o.win === 'kill') o.need = Math.min(99, o.need);
+      return o;
+    } catch (err) { return null; }
+  }
+
+  // 起名字 / 生成。save=true 就是「生成」：起完名顺手存进我的关卡
+  function askName(save) {
+    var e = S.edit; if (!e) return false;
+    var nm = null;
+    try { nm = window.prompt('给这一关起个名字（最多 12 字）：', e.name || '第 ' + (mineList().length + 1) + ' 关'); } catch (err) {}
+    if (nm === null || nm === undefined) return false;
+    e.name = escName(nm) || '无名';
+    if (!save) { Sound.pick(); return true; }
+    var r = saveLevel(e.name);
+    if (r === 'full') S.floats.push({ s: '最多存 ' + MAX_MINE + ' 关，先删一张', x: W / 2, y: 130, t: 80, c: PAL.red });
+    else if (r === 'over') S.floats.push({ s: '「' + e.name + '」已更新', x: W / 2, y: 130, t: 70, c: PAL.mint });
+    else S.floats.push({ s: '存下了 · ' + e.name, x: W / 2, y: 130, t: 70, c: PAL.mint });
+    Sound.pick();
+    return true;
+  }
+
+  // ── 撤销 ──
+  // 编辑器没有撤销等于没有编辑器 —— 画错一块就得从头来。
+  function snapOf(e) {
+    return JSON.stringify({ p: e.plats, i: e.items, t: e.types, o: e.goal,
+                            w: e.win, k: e.need, g: e.gap, m: e.maxAlive, q: e.goalQuiet, x: e.wep });
+  }
+  function pushUndo() {
+    var e = S.edit; if (!e) return;
+    if (!e.undo) e.undo = [];
+    var s = snapOf(e);
+    if (e.undo.length && e.undo[e.undo.length - 1] === s) return;
+    e.undo.push(s);
+    if (e.undo.length > 30) e.undo.shift();
+  }
+  function doUndo() {
+    var e = S.edit; if (!e || !e.undo || !e.undo.length) return false;
+    var s = JSON.parse(e.undo.pop());
+    e.plats = s.p; e.items = s.i; e.types = s.t; e.goal = s.o;
+    e.win = s.w; e.need = s.k; e.gap = s.g; e.maxAlive = s.m; e.goalQuiet = s.q; e.wep = s.x || 0;
+    return true;
+  }
+
+  // ── 画布上的坐标 ──
+  // 画和点击都从这里取，不各写一份 ——「格子和方向键对不上」就是这么来的
+  var SL = { chipA: [20, 46, 54, 26], chipB: [80, 46, 54, 26], chipC: [140, 46, 54, 26] };
+  // 起手武器：三种笔右边、五个按钮左边那块空地。
+  // 不动规矩面板的网格 —— 那个刚被老板说过乱，能不碰就不碰。
+  function wepChip(i) { return [200 + i * 78, 46, 72, 26]; }
+  var BTN = [
+    { k: 'rule', s: '规 矩',  x: 456 },
+    { k: 'test', s: '试 玩',  x: 554 },
+    { k: 'save', s: '生 成',  x: 652 },
+    { k: 'mine', s: '关 卡',  x: 750 },
+    { k: 'code', s: '分享码', x: 848 }
+  ];
+  var BTN_Y = 30, BTN_W = 92, BTN_H = 42;
+  // 一张死网格。标签右对齐到 lx，控件从 cx 起，行心是 r1/r2/r3/s1/s2/s3/r7。
+  // 所有行高、间距都是同一套数，位置全从这儿取 —— 上一版是各处自己算，所以越加越乱。
+  var TBTN = [
+    { k: 'make', x: 270, y: 508, w: 200, h: 34 },
+    { k: 'mine', x: 490, y: 508, w: 200, h: 34 }
+  ];
+  var PG = { x: 110, y: 88, w: 740, h: 470,
+             lx: 228, cx: 246, sx: 246, sw: 460, vx: 720,
+             r1: 200, r2: 248, r3: 294, s1: 340, s2: 382, s3: 424, r7: 470 };
+  function hit2(p, q) { return p.x >= q[0] && p.x <= q[0] + q[2] && p.y >= q[1] && p.y <= q[1] + q[3]; }
+  function knobX(v, lo, hi) { return PG.sx + PG.sw * clamp((v - lo) / (hi - lo), 0, 1); }
+  function winChip(i)  { return [PG.cx + i * 116, PG.r2 - 16, 108, 32]; }
+  function typeChip(i) { return [PG.cx + i * 78,  PG.r3 - 16,  72, 32]; }
+  function tplChip(i)  { return [PG.cx + i * 116, PG.r7 - 16, 108, 32]; }
+  function nameBox()   { return [PG.cx, PG.r1 - 18, PG.sw, 36]; }   // 跟滑块一样宽，右边缘对齐
+  function quietBox()  { return [PG.cx, PG.s1 - 16, 150, 32]; }   // reach 时占「第一个滑块」那一行
+  function needRange() { return (S.edit && S.edit.win === 'survive') ? [5, 120] : [1, 99]; }
+  function sliderY(which) { return which === 'need' ? PG.s1 : (which === 'gap' ? PG.s2 : PG.s3); }
+  function sliderWhich(y) {
+    if (Math.abs(y - PG.s1) < 17) return 'need';
+    if (Math.abs(y - PG.s2) < 17) return 'gap';
+    if (Math.abs(y - PG.s3) < 17) return 'alive';
+    return null;
+  }
+  function setSlide(which, mx) {
+    var e = S.edit, f = clamp((mx - PG.sx) / PG.sw, 0, 1);
+    if (which === 'need') {
+      var r = needRange();
+      e.need = Math.max(r[0], Math.round(r[0] + f * (r[1] - r[0])));
+    } else if (which === 'gap')   e.gap = Math.max(24, Math.round(24 + f * 376));      // 24 ~ 400 帧
+    else if (which === 'alive')   e.maxAlive = Math.max(1, Math.round(1 + f * 8));     // 1 ~ 9 只
+  }
+  function applyTpl(i) {
+    var t = TPLS[i]; if (!t) return;
+    pushUndo();
+    S.edit.plats = t.plats.map(function (q) { return q.slice(); });
+    S.edit.items = t.items.map(function (q) { return q.slice(); });
+  }
+
+  // ── 试玩 / 生成 ──
+  // 试玩是暂时的：退出时要把那张临时卡收掉，否则选章界面会永远多出一关。
+  function dropCustom() {
+    while (CHAPTERS.length && CHAPTERS[CHAPTERS.length - 1].__custom) CHAPTERS.pop();
+    S.chapter = clamp(S.chapter, 0, CHAPTERS.length - 1);
+  }
+  function playCustom(e) {
+    dropCustom();
+    var C = {
+      __custom: true, n: escName(e.name) || '自制', sel: '你自己做的',
+      sub: winText(e) + '。' + (e.win === 'reach' ? '\n旗子就在场地上。' : '\n撑不住就重来。'),
+      types: e.types.map(function (i) { return EDIT_TYPES[i]; }),
+      need: e.need, gap: e.gap, maxAlive: e.maxAlive || 6,
+      plats: e.plats.map(function (q) { return [q[0], q[1], q[2], q[3]]; }),
+      items: e.items.map(function (q) { return [ITEM_ORDER[q[0]], q[1], q[2]]; })
+    };
+    C.wep = Math.max(0, Math.min(2, e.wep || 0));
+    if (e.win && e.win !== 'kill') C.win = e.win;
+    if (e.win === 'reach') { C.goal = (e.goal || [430, 150, 120, 60]).slice(); C.goalQuiet = !!e.goalQuiet; }
+    CHAPTERS.push(C);
+    S.testing = true;
+    startChapter(CHAPTERS.length - 1);
+  }
+
+  function goWorkshop() {
+    S.testing = false; dropCustom();
+    if (!S.edit) S.edit = freshEdit();
+    S.edit.panel = false; S.edit.showCode = false;
+    S.mode = 'workshop';
+    Sound.ui();
+  }
+
+  // ── 画 ──
+  function drawChip(q, on, label, sub, col) {
+    col = col || PAL.mint;
+    ctx.fillStyle = on ? 'rgba(95,240,192,.24)' : 'rgba(120,150,220,.13)';
+    rr(ctx, q[0], q[1], q[2], q[3], 8); ctx.fill();
+    ctx.strokeStyle = on ? col : 'rgba(120,160,230,.25)'; ctx.lineWidth = on ? 1.5 : 1;
+    rr(ctx, q[0] + .7, q[1] + .7, q[2] - 1.4, q[3] - 1.4, 8); ctx.stroke();
+    txt(ctx, label, q[0] + q[2] / 2, q[1] + (sub ? 14 : q[3] / 2 + 4),
+      { a: 'center', s: 12.5, c: on ? PAL.ink : 'rgba(155,175,215,.72)', w: '800' });
+    if (sub) txt(ctx, sub, q[0] + q[2] / 2, q[1] + 27,
+      { a: 'center', s: 10, c: on ? 'rgba(200,255,235,.75)' : 'rgba(140,160,200,.5)', w: '600' });
+  }
+
+  function drawSlider(v, lo, hi, cy3, hot) {
+    var cx4 = knobX(v, lo, hi);
+    ctx.fillStyle = 'rgba(120,150,220,.16)';
+    rr(ctx, PG.sx, cy3 - 5, PG.sw, 10, 5); ctx.fill();
+    ctx.fillStyle = 'rgba(255,209,102,.45)';
+    rr(ctx, PG.sx, cy3 - 5, Math.max(0, cx4 - PG.sx), 10, 5); ctx.fill();
+    ctx.save();
+    if (hot) { ctx.shadowColor = 'rgba(255,209,102,.9)'; ctx.shadowBlur = 14; }
+    ctx.fillStyle = hot ? '#fff2c4' : PAL.gold;
+    ctx.beginPath(); ctx.arc(cx4, cy3, hot ? 9 : 7.5, 0, 6.2832); ctx.fill();
+    ctx.restore();
+    txt(ctx, String(v), PG.vx, cy3 + 5, { s: 14, c: PAL.gold, w: '800' });
+  }
+
+  // 规矩面板：所有「数值和条件」都在这儿，画布上只留用鼠标摆的东西
+  //
+  // 布局是一张死网格：标签一律右对齐到 PG.lx，控件一律从 PG.cx 起，行高一模一样。
+  // 上一版是「控件摆到哪算哪、说明见缝插针」，所以看着乱 —— 说明文字还飘到卡片外面去了。
+  var ROW_HINT = {
+    kill:    '把这一关的怪杀够 N 个就算过 —— 把圈摁在怪身上别松手',
+    survive: '活够 N 秒就算过 —— 杀不杀都行，活下去是唯一的指标',
+    reach:   '在场地里插一面旗，爬到那儿就算过 —— 回画布切到「旗子」笔，点一下摆它'
+  };
+  function drawRulePanel() {
+    var e = S.edit;
+    ctx.fillStyle = 'rgba(4,7,14,.86)'; ctx.fillRect(0, 0, W, H);
+    ctx.fillStyle = 'rgba(10,20,34,.98)';
+    rr(ctx, PG.x, PG.y, PG.w, PG.h, 16); ctx.fill();
+    ctx.strokeStyle = 'rgba(120,170,240,.3)'; ctx.lineWidth = 1.5;
+    rr(ctx, PG.x + .8, PG.y + .8, PG.w - 1.6, PG.h - 1.6, 16); ctx.stroke();
+
+    txt(ctx, '这一关的规矩', W / 2, PG.y + 40, { a: 'center', s: 26, c: PAL.ink, w: '800', glow: 'rgba(79,227,255,.5)', blur: 12 });
+    txt(ctx, '画布上摆的是样子，这里写的是它的脾气', W / 2, PG.y + 66,
+      { a: 'center', s: 12, c: 'rgba(150,175,220,.8)', w: '600' });
+    // 表头下面拉一条线，把标题和表格分开
+    ctx.strokeStyle = 'rgba(120,170,240,.16)'; ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.moveTo(PG.x + 40, PG.y + 88.5); ctx.lineTo(PG.x + PG.w - 40, PG.y + 88.5); ctx.stroke();
+
+    // 每一行的标签都落在同一条竖线上 —— 这是「不凌乱」的全部秘密
+    function rowLabel(s, cy) {
+      txt(ctx, s, PG.lx, cy + 5, { a: 'right', s: 13, c: 'rgba(155,180,225,.85)', w: '700' });
+    }
+
+    // ① 名字
+    rowLabel('名 字', PG.r1);
+    var nb = nameBox();
+    ctx.fillStyle = 'rgba(120,150,220,.1)'; rr(ctx, nb[0], nb[1], nb[2], nb[3], 8); ctx.fill();
+    ctx.strokeStyle = 'rgba(120,160,230,.28)'; ctx.lineWidth = 1;
+    rr(ctx, nb[0] + .7, nb[1] + .7, nb[2] - 1.4, nb[3] - 1.4, 8); ctx.stroke();
+    txt(ctx, e.name ? e.name : '（点一下起个名）', nb[0] + 14, PG.r1 + 5,
+      { s: 14, c: e.name ? PAL.ink : 'rgba(130,155,200,.6)', w: '700' });
+
+    // ② 怎么算过
+    rowLabel('怎么算过', PG.r2);
+    for (var i = 0; i < WINS.length; i++) drawChip(winChip(i), e.win === WINS[i].k, WINS[i].n);
+
+    // ③ 出什么怪
+    rowLabel('出什么怪', PG.r3);
+    for (var t = 0; t < EDIT_TYPES.length; t++) {
+      var on = e.types.indexOf(t) >= 0, q = typeChip(t);
+      ctx.fillStyle = on ? 'rgba(79,227,255,.22)' : 'rgba(120,150,220,.13)';
+      rr(ctx, q[0], q[1], q[2], q[3], 8); ctx.fill();
+      ctx.strokeStyle = on ? PAL.cy : 'rgba(120,160,230,.25)'; ctx.lineWidth = on ? 1.4 : 1;
+      rr(ctx, q[0] + .7, q[1] + .7, q[2] - 1.4, q[3] - 1.4, 8); ctx.stroke();
+      txt(ctx, (t + 1) + ' ' + TYPE_CN[EDIT_TYPES[t]], q[0] + q[2] / 2, PG.r3 + 5,
+        { a: 'center', s: 11.5, c: on ? PAL.ink : 'rgba(150,170,210,.7)', w: '700' });
+    }
+
+    // ④⑤⑥ 三个数值 —— 第一行跟着通关条件换身份
+    if (e.win === 'reach') {
+      rowLabel('爬上旗', PG.s1);
+      drawChip(quietBox(), e.goalQuiet, e.goalQuiet ? '必须空着手' : '攥着也算', null, PAL.gold);
+      txt(ctx, e.goalQuiet ? '到旗子前得把攥着的全撒手' : '手里攥着东西也能通关',
+        quietBox()[0] + quietBox()[2] + 16, PG.s1 + 5,
+        { s: 12, c: 'rgba(155,180,220,.8)', w: '600' });
+    } else if (e.win === 'survive') {
+      rowLabel('撑住秒数', PG.s1);
+      drawSlider(e.need, 5, 120, PG.s1, e.slide === 'need');
+    } else {
+      rowLabel('击杀数', PG.s1);
+      drawSlider(e.need, 1, 99, PG.s1, e.slide === 'need');
+    }
+    rowLabel('出怪间隔', PG.s2); drawSlider(e.gap, 24, 400, PG.s2, e.slide === 'gap');
+    rowLabel('同屏上限', PG.s3); drawSlider(e.maxAlive, 1, 9, PG.s3, e.slide === 'alive');
+
+    // ⑦ 换个底子
+    rowLabel('换个底子', PG.r7);
+    for (var k = 0; k < TPLS.length; k++) {
+      var tq = tplChip(k);
+      ctx.fillStyle = 'rgba(120,150,220,.13)';
+      rr(ctx, tq[0], tq[1], tq[2], tq[3], 8); ctx.fill();
+      ctx.strokeStyle = 'rgba(120,160,230,.25)'; ctx.lineWidth = 1;
+      rr(ctx, tq[0] + .7, tq[1] + .7, tq[2] - 1.4, tq[3] - 1.4, 8); ctx.stroke();
+      txt(ctx, TPLS[k].n, tq[0] + tq[2] / 2, PG.r7 + 5,
+        { a: 'center', s: 12.5, c: 'rgba(165,185,225,.85)', w: '700' });
+    }
+    txt(ctx, '会覆盖地形', tplChip(2)[0] + tplChip(2)[2] + 16, PG.r7 + 5,
+      { s: 11.5, c: 'rgba(135,160,205,.7)', w: '500' });
+
+    // 一行说明，跟着通关条件变 —— 上一版是四条说明飘在四个地方，那才是乱源。
+    // 上面拉条线把它跟表格隔开，不然它贴着「换个底子」那一行，像是那一行的注解。
+    ctx.strokeStyle = 'rgba(120,170,240,.16)'; ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.moveTo(PG.x + 40, PG.y + PG.h - 62.5); ctx.lineTo(PG.x + PG.w - 40, PG.y + PG.h - 62.5); ctx.stroke();
+    txt(ctx, ROW_HINT[e.win] || ROW_HINT.kill, W / 2, PG.y + PG.h - 40,
+      { a: 'center', s: 13, c: 'rgba(160,205,245,.9)', w: '600' });
+    txt(ctx, '按 R 或 Esc 关掉这块　·　Z 撤销', W / 2, PG.y + PG.h - 18,
+      { a: 'center', s: 12, c: 'rgba(140,170,215,.7)', w: '600' });
+  }
+
+  // 工坊：画布就是竞技场，直接在场上摆东西
+  function drawWorkshop() {
+    var e = S.edit || freshEdit();
+    drawBg(); drawArena();
+    // 地面 —— 得让玩家一眼看出「怪从这儿走、人站这儿」
+    var grd = ctx.createLinearGradient(0, FLOOR, 0, H);
+    grd.addColorStop(0, 'rgba(60,110,180,.30)'); grd.addColorStop(1, 'rgba(20,40,80,.10)');
+    ctx.fillStyle = grd; ctx.fillRect(0, FLOOR, W, H - FLOOR);
+
+    // 旗子（通关目标是「爬上旗子」时才画）
+    if (e.win === 'reach' && e.goal) {
+      var g = e.goal, pu = .5 + Math.sin(S.t * .07) * .5;
+      ctx.save();
+      ctx.globalAlpha = .16 + pu * .2; ctx.fillStyle = e.goalQuiet ? PAL.gold : PAL.mint;
+      rr(ctx, g[0], g[1], g[2], g[3], 9); ctx.fill();
+      ctx.globalAlpha = .6 + pu * .35;
+      ctx.strokeStyle = e.goalQuiet ? PAL.gold : PAL.mint; ctx.lineWidth = 2;
+      rr(ctx, g[0] + 1, g[1] + 1, g[2] - 2, g[3] - 2, 9); ctx.stroke();
+      ctx.restore();
+      txt(ctx, '旗子', g[0] + g[2] / 2, g[1] + g[3] / 2 + 5,
+        { a: 'center', s: 14, c: e.goalQuiet ? PAL.gold : PAL.mint, w: '800' });
+    }
+    // 跳台
+    for (var i = 0; i < e.plats.length; i++) {
+      var q = e.plats[i];
+      ctx.fillStyle = 'rgba(79,227,255,.22)';
+      rr(ctx, q[0], q[1], q[2], q[3], 6); ctx.fill();
+      ctx.strokeStyle = 'rgba(140,240,255,.8)'; ctx.lineWidth = 1.6;
+      rr(ctx, q[0] + .8, q[1] + .8, q[2] - 1.6, q[3] - 1.6, 6); ctx.stroke();
+    }
+    // 正在拖的那一块
+    if (e.drag) {
+      var d = e.drag;
+      ctx.fillStyle = 'rgba(255,209,102,.25)';
+      rr(ctx, Math.min(d.x0, d.x1), Math.min(d.y0, d.y1),
+         Math.abs(d.x1 - d.x0), Math.max(18, Math.abs(d.y1 - d.y0)), 6); ctx.fill();
+    }
+    // 道具
+    for (var k2 = 0; k2 < e.items.length; k2++) {
+      var it = e.items[k2], def = ITEMS[ITEM_ORDER[it[0]]];
+      ctx.globalAlpha = .3; ctx.fillStyle = def.c;
+      ctx.beginPath(); ctx.arc(it[1], it[2], 20, 0, 6.2832); ctx.fill();
+      ctx.globalAlpha = 1;
+      ctx.save(); ctx.translate(it[1], it[2]); ctx.rotate(Math.PI / 4);
+      ctx.fillStyle = def.c; rr(ctx, -8, -8, 16, 16, 4); ctx.fill(); ctx.restore();
+    }
+
+    ctx.fillStyle = 'rgba(5,9,18,.82)'; ctx.fillRect(0, 0, W, 100);
+    ctx.strokeStyle = 'rgba(90,140,220,.22)'; ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.moveTo(0, 100.5); ctx.lineTo(W, 100.5); ctx.stroke();
+    ctx.strokeStyle = 'rgba(120,200,255,.75)'; ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.moveTo(0, FLOOR); ctx.lineTo(W, FLOOR); ctx.stroke();
+    txt(ctx, '地面', 12, FLOOR + 20, { s: 11.5, c: 'rgba(140,190,240,.75)', w: '700' });
+
+    txt(ctx, '工 坊', 20, 30, { s: 20, c: PAL.ink, w: '800', glow: 'rgba(95,240,192,.5)', blur: 11 });
+    // 三种笔：能点，Tab 也能切。Tab 会跟浏览器抢焦点，所以点的一定要有。
+    var MODES = ['画台', '放物', '旗子'];
+    for (var ci = 0; ci < 3; ci++) {
+      var cq = [SL.chipA, SL.chipB, SL.chipC][ci];
+      drawChip(cq, e.tab === ci, MODES[ci]);
+    }
+    txt(ctx, e.tab === 0 ? '按住左键拖一块 · 右键删'
+        : (e.tab === 1 ? '左键点一下放 · I 换一种 · 右键删' : '左键点一下挪旗子'),
+      20, 90, { s: 11, c: 'rgba(150,200,190,.8)', w: '600' });
+
+    // 起手武器 —— 作者选的这把会跟着分享码走
+    txt(ctx, '起手武器（跟着码一起传）', 200, 34, { s: 11, c: 'rgba(190,170,120,.85)', w: '600' });
+    for (var wc2 = 0; wc2 < WEAPONS.length; wc2++) {
+      drawChip(wepChip(wc2), (e.wep || 0) === wc2, WEAPONS[wc2].n, null, PAL.gold);
+    }
+
+    // 右上角那排：全都能点。只有键盘入口的功能等于没有。
+    for (var b = 0; b < BTN.length; b++) {
+      var B = BTN[b];
+      ctx.fillStyle = b === 0 ? 'rgba(79,227,255,.14)' : 'rgba(120,150,220,.1)';
+      rr(ctx, B.x, BTN_Y, BTN_W, BTN_H, 10); ctx.fill();
+      ctx.strokeStyle = b === 0 ? 'rgba(79,227,255,.5)' : 'rgba(120,160,230,.28)'; ctx.lineWidth = 1.2;
+      rr(ctx, B.x + .6, BTN_Y + .6, BTN_W - 1.2, BTN_H - 1.2, 10); ctx.stroke();
+      txt(ctx, B.s, B.x + BTN_W / 2, BTN_Y + 27, { a: 'center', s: 14, c: b === 0 ? PAL.cy : 'rgba(190,210,245,.9)', w: '800' });
+    }
+    txt(ctx, winText(e) + '　·　每 ' + e.gap + ' 帧来一只　·　同屏最多 ' + e.maxAlive + ' 只　·　' +
+      e.types.length + ' 种怪　·　' + e.plats.length + ' 块台　·　' + e.items.length + ' 个道具',
+      W - 20, 88, { a: 'right', s: 11.5, c: 'rgba(160,190,235,.85)', w: '600' });
+
+    txt(ctx, 'Enter 试玩（不留下）　·　S 生成并保存　·　L 我的关卡　·　C 分享码　·　V 粘贴　·　R 规矩　·　Z 撤销　·　X 清空　·　Esc 回首页',
+      W / 2, H - 14, { a: 'center', s: 11.5, c: 'rgba(150,175,220,.85)', w: '600' });
+  }
+
+  // 「我的关卡」：一列存下来的关
+  function drawMineList() {
+    var L = mineList(), rows = mineRows();
+    ctx.fillStyle = '#04070e'; ctx.fillRect(0, 0, W, H);
+    txt(ctx, '我的关卡', W / 2, 74, { a: 'center', s: 32, c: PAL.ink, w: '800', glow: 'rgba(95,240,192,.55)', blur: 13 });
+    txt(ctx, '编辑 = 载进来改　·　玩 = 直接打　·　删 = 扔掉', W / 2, 106,
+      { a: 'center', s: 12.5, c: 'rgba(150,175,220,.8)', w: '600' });
+
+    if (!L.length) {
+      txt(ctx, '还没有生成过任何关卡', W / 2, 262, { a: 'center', s: 18, c: 'rgba(140,180,220,.55)', w: '700' });
+      txt(ctx, '回编辑器，按 S 就生成一张', W / 2, 294, { a: 'center', s: 13, c: 'rgba(130,165,210,.45)', w: '500' });
+    }
+    for (var i = 0; i < rows.length; i++) {
+      var r = rows[i];
+      ctx.fillStyle = 'rgba(120,150,220,.07)';
+      rr(ctx, r.x, r.y, r.w, r.h, 10); ctx.fill();
+      ctx.strokeStyle = 'rgba(120,160,230,.18)'; ctx.lineWidth = 1;
+      rr(ctx, r.x + .5, r.y + .5, r.w - 1, r.h - 1, 10); ctx.stroke();
+      txt(ctx, (i + 1) + '　' + r.n, r.x + 16, r.y + 26, { s: 16, c: PAL.ink, w: '700' });
+      txt(ctx, r.sub, r.x + 230, r.y + 25, { s: 12, c: 'rgba(150,180,225,.7)', w: '600' });
+      var btn = function (q, s, c) {
+        ctx.fillStyle = c; rr(ctx, q[0], q[1], q[2], q[3], 7); ctx.fill();
+        txt(ctx, s, q[0] + q[2] / 2, q[1] + 16, { a: 'center', s: 12, c: PAL.ink, w: '700' });
+      };
+      btn(r.edit, '编辑', 'rgba(79,227,255,.20)');
+      btn(r.play, '玩',   'rgba(95,240,192,.22)');
+      btn(r.del,  '删',   'rgba(255,90,120,.22)');
+    }
+    txt(ctx, '最多存 ' + MAX_MINE + ' 关　·　按 L 或 Esc 回编辑器', W / 2, H - 14,
+      { a: 'center', s: 11.5, c: 'rgba(150,175,220,.85)', w: '600' });
+  }
+
+  // 分享码单独占一屏 —— 之前它是盖在编辑器上的，背后花花绿绿全透出来，看不清
+  function drawCodeScreen() {
+    var e = S.edit;
+    ctx.fillStyle = '#04070e'; ctx.fillRect(0, 0, W, H);
+    var code = editEncode(e);
+    txt(ctx, '分享码', W / 2, 132, { a: 'center', s: 36, c: PAL.ink, w: '800', glow: 'rgba(79,227,255,.6)', blur: 14 });
+    txt(ctx, '上面那个框已经全选好了 —— 按 Ctrl+C 复制，发给别人', W / 2, 172,
+      { a: 'center', s: 13.5, c: PAL.mint, w: '700' });
+    txt(ctx, '他打开游戏 → 进工坊 → 按 V → 粘进去 → 就能玩到你这关（名字会一起带过去）', W / 2, 196,
+      { a: 'center', s: 12.5, c: 'rgba(150,175,220,.85)', w: '600' });
+    // 从 432 起 —— 上面 315~380 那块是文本框的地盘，别叠上去
+    var lines = wrapCode(code, 58);
+    while (lines.length > 4) lines = wrapCode(code, Math.ceil(code.length / 4) + 6);
+    for (var L = 0; L < lines.length; L++) {
+      var yy = 432 + L * 28;
+      ctx.fillStyle = 'rgba(79,227,255,.07)';
+      rr(ctx, 60, yy - 17, W - 120, 26, 6); ctx.fill();
+      txt(ctx, lines[L], W / 2, yy, { a: 'center', s: 13, c: 'rgba(120,200,235,.8)', w: '500' });
+    }
+    txt(ctx, '这一屏只能看，选不中也没关系 —— 上面的框可以直接复制', W / 2, 402,
+      { a: 'center', s: 11.5, c: 'rgba(130,155,200,.7)', w: '500' });
+    txt(ctx, '按 C 返回编辑', W / 2, H - 46, { a: 'center', s: 13.5, c: PAL.mint, w: '800' });
+  }
+
+  function addCoins(n) {
+    S.coins += n;
+    var sv = Save.get(); sv.coins = (sv.coins || 0) + n;
+    Save.later();          // 不立刻写盘
+  }
+
+  var SHOP_W = 620, SHOP_H = 82, SHOP_GAP = 12, SHOP_Y0 = 184;
+  function shopRows() {
+    return WEAPONS.map(function (w, i) {
+      return { i: i, w: w, x: W / 2 - SHOP_W / 2, y: SHOP_Y0 + i * (SHOP_H + SHOP_GAP),
+               ww: SHOP_W, hh: SHOP_H };
+    });
+  }
+  function buyWeapon(i) {
+    var wp = WEAPONS[i];
+    if (!wp) return;
+    var sv = Save.get();
+    if (owns(i)) { S.weapon = i; Sound.ui(); return; }        // 已有 → 直接装备
+    if ((sv.coins || 0) < wp.price) { Sound.thaw(); S.shake = 6; return; }
+    sv.coins -= wp.price;
+    sv.owned = (sv.owned || []).concat([wp.id]);
+    Save.flush();
+    S.weapon = i;
+    S.floats.push({ s: '买下 · ' + wp.n, x: W / 2, y: 128, t: 90, c: PAL.gold });
+    Sound.pick();
+  }
+  function goShop() { S.mode = 'shop'; S.shopIdx = 0; Sound.ui(); }
+
+  function drawShop() {
+    ctx.fillStyle = 'rgba(4,7,14,.95)';
+    ctx.fillRect(0, 0, W, H);
+    txt(ctx, '商 店', W / 2, 76, { a: 'center', s: 38, c: PAL.ink, w: '800', glow: 'rgba(255,209,102,.6)', blur: 13 });
+    var sv = Save.get();
+    txt(ctx, '金币 ' + (sv.coins || 0), W / 2, 112, { a: 'center', s: 17, c: PAL.gold, w: '800' });
+    txt(ctx, '击杀掉落金币 · 越硬的敌人越值钱', W / 2, 134,
+      { a: 'center', s: 11.5, c: 'rgba(130,155,200,.75)', w: '500' });
+    // 之前写「装备中」，玩家以为一局只能带一把 —— 说清楚
+    txt(ctx, '买过的都能带着走：局内按 1 / 2 / 3 随时换，不是只能挑一把',
+      W / 2, 160, { a: 'center', s: 13.5, c: PAL.mint, w: '800' });
+
+    var rows = shopRows();
+    for (var r = 0; r < rows.length; r++) {
+      var it = rows[r], wp = it.w;
+      var have = owns(it.i), cur = S.weapon === it.i, can = (sv.coins || 0) >= wp.price;
+      var hov = S.mouse.x >= it.x && S.mouse.x <= it.x + it.ww &&
+                S.mouse.y >= it.y && S.mouse.y <= it.y + it.hh;
+      ctx.fillStyle = cur ? 'rgba(255,209,102,.16)' : (hov && (have || can) ? 'rgba(79,227,255,.16)' : 'rgba(120,150,220,.07)');
+      rr(ctx, it.x, it.y, it.ww, it.hh, 12); ctx.fill();
+      ctx.strokeStyle = cur ? 'rgba(255,209,102,.75)' : (hov && (have || can) ? 'rgba(79,227,255,.6)' : 'rgba(120,150,220,.18)');
+      ctx.lineWidth = cur ? 2 : 1.2;
+      rr(ctx, it.x + .8, it.y + .8, it.ww - 1.6, it.hh - 1.6, 12); ctx.stroke();
+
+      txt(ctx, '[' + (it.i + 1) + ']  ' + wp.n, it.x + 22, it.y + 32,
+        { s: 21, c: cur ? PAL.gold : (have ? PAL.ink : 'rgba(205,225,255,.9)'), w: '800' });
+      txt(ctx, wp.d, it.x + 22, it.y + 60,
+        { s: 12.5, c: 'rgba(150,175,215,.85)', w: '500' });
+
+      var state = cur ? '▶ 正在用（按 ' + (it.i + 1) + '）'
+                : (have ? '已拥有 · 点击切过去' : (can ? wp.price + ' 金 · 点击买下' : wp.price + ' 金（还差 ' + (wp.price - (sv.coins || 0)) + '）'));
+      txt(ctx, state, it.x + it.ww - 22, it.y + 34,
+        { a: 'right', s: 14, c: cur ? PAL.gold : (have ? PAL.cy : (can ? PAL.mint : 'rgba(150,120,140,.85)')), w: '700' });
+    }
+    txt(ctx, '1 / 2 / 3 或点击选购　·　Esc / B 返回选章', W / 2, 546,
+      { a: 'center', s: 12, c: 'rgba(140,165,210,.75)', w: '500' });
+  }
+
+  function applyItem(t, x, y) {
+    var def = ITEMS[t] || ITEMS.shield;
+    if (t === 'shield') S.shield++;                 // 护盾能攒，不再是一次性的开关
+    else if (t === 'heart') S.hp = Math.min(S.maxHp || MAX_HP, S.hp + 1);
+    else if (t === 'pulse') S.pulse.cd = 0;
+    else if (t === 'breathe') S.breathe = BREATHE_TIME;
+    Sound.pick();
+    S.floats.push({ s: def.n + ' · ' + def.d, x: x, y: y - 26, t: 82, c: def.c });
+    for (var i = 0; i < 16; i++) {
+      S.parts.push({
+        x: x, y: y, vx: rnd(-3.5, 3.5), vy: rnd(-4.5, 1),
+        life: rnd(18, 34), max: 34, c: def.c, s: rnd(2, 4)
+      });
+    }
+  }
+
+  // ── 通关条件 ──
+  // 本来只有「杀够 N 个」一招打天下 —— 12 章里 11 章是同一件事。
+  // 现在数据表里用 C.win 指定，默认还是 kill：
+  //   kill    杀够 need 个
+  //   survive 撑住 need 秒（不杀也行）
+  //   reach   抵达 C.goal 那块区域
+  //   door    终章那扇门，单独判
+  function winKind() { var C = CHAPTER(); return C.infinite ? 'infinite' : (C.finale ? 'door' : (C.win || 'kill')); }
+  function isBoss() { return winKind() === 'boss'; }
+  function goalMet() {
+    var C = CHAPTER(), k = winKind();
+    if (k === 'survive') return S.chapterT >= C.need * 60;
+    if (k === 'reach')   return !!S.goalHit;
+    if (k === 'door')    return !!(S.door && S.door.open);
+    if (k === 'boss')    return !!(S.boss && S.boss.dead);
+    if (k === 'infinite') return false;              // 没有通关这回事
+    return S.chapterKilled >= S.chapterNeed;
+  }
+  function goalLabel() {          // 游戏中 / 暂停时的一行
+    var C = CHAPTER(), k = winKind();
+    if (k === 'survive') return '撑住 ' + Math.max(0, Math.ceil(C.need - S.chapterT / 60)) + ' 秒';
+    if (k === 'reach') {
+      var onGoal = S.goal && aabb(S.ch, S.goal);
+      if (C.goalQuiet && onGoal && S.field.hold > 0) return '松开手 —— 攥着东西不算数';
+      return '爬上最上面那层' + (C.goalQuiet ? '（空着手）' : '');
+    }
+    if (k === 'door')    return '空手走到门口';
+    if (k === 'boss')    return S.boss ? ('它的眼睛 ' + Math.max(0, S.boss.hp) + ' / ' + S.boss.maxhp) : '';
+    if (k === 'infinite') return S.breath ? ('喘口气 ' + Math.ceil(S.waveT / 60) + ' 秒') : ('第 ' + (S.wave || 1) + ' 波');
+
+    return '击杀 ' + S.chapterKilled + ' / ' + S.chapterNeed;
+  }
+  function goalBrief() {          // 章节卡上的一行
+    var C = CHAPTER(), k = winKind();
+    if (k === 'survive') return '目标：撑住 ' + C.need + ' 秒';
+    if (k === 'reach')   return '目标：爬到最上面' + (C.goalQuiet ? '，而且要空着手' : '');
+    if (k === 'door')    return '目标：走到那扇门';
+    if (k === 'boss')    return '目标：等它的眼睛落下来，然后砸碎它';
+    if (k === 'infinite') return '目标：活下去。没有终点。';
+    return '目标：击杀 ' + C.need + ' 个';
+  }
+
+  // 敌人持续生成；通关靠达成目标，干等是等不来的
+  function spawnTick() {
+    var C = CHAPTER();
+    S.spawnT--;
+    if (S.spawnT > 0) return;
+    S.spawnT = C.gap;
+    // 同屏上限。没有它的话，出怪只增不减 —— 终章尤其致命：
+    // 它没有击杀指标，杀敌又要把门的充能清零，场上只会越堆越多。
+    var cap = C.maxAlive || 9, alive = 0;
+    for (var ai = 0; ai < S.enemies.length; ai++) {
+      if (!S.enemies[ai].dead && !S.enemies[ai].T.boss) alive++;   // 眼睛不算小怪名额
+    }
+    if (alive >= cap) return;
+    if (S.breath) return;          // 无限模式的喘息期间，一只新怪都不出
+    var type = C.types[Math.floor(Math.random() * C.types.length)];
+    var p = spawnPoint();
+    S.enemies.push(makeEnemy(type, p.x, p.y, S.chapter));
+  }
+
+  function freshPlayer() {
+    return {
+      x: W * .5 - PW / 2, y: FLOOR - PH, w: PW, h: PH,
+      vx: 0, vy: 0, grounded: false, ground: null,
+      coyote: 0, buf: 0, face: 1, walkT: 0, sq: 1, sqx: 1,
+      prevBottom: 0,
+      dropFrom: null, dropT: 0, wasDown: false,
+      wasJump: false, jumpHold: 0, landT: 0, blink: 0, blinkT: 90, stepT: 0
+    };
+  }
+
+  function startChapter(i, booting) {
+    if (!(CHAPTERS[i] && CHAPTERS[i].__custom)) dropCustom();            // 开真关之前先把试玩的临时卡收掉
+    S.chapter = clamp(i, 0, CHAPTERS.length - 1);
+    var C = CHAPTER();
+    var sv = Save.get();
+    if (!booting && !C.__custom) {      // 自制关不是进度，别写进存档
+      if (S.chapter + 1 > (sv.unlocked || 1)) sv.unlocked = S.chapter + 1;
+      if (C.finale) sv.reachedFinale = true;
+      sv.plays = (sv.plays || 0) + 1;
+      Save.flush();
+      if (S.chapter + 1 >= Math.ceil(CHAPTERS.length / 2)) unlock('ch5');
+      if (S.chapter + 1 >= REAL_N) unlock('ch9');
+    }
+    S.finaleClean = C.finale;      // 终章：有没有一次都没攥过
+    // 自制关里三把武器是白开的。退回正式章时，手里那把要是没买过就得放下 ——
+    // 不然就成白送了。（S.weapon 是全局的，会跟着你走。）
+    if (!C.__custom && !owns(S.weapon)) S.weapon = 0;
+    // 自制关：作者指定的那把直接上手 —— 别人粘码进来就该拿着设计时的那把
+    if (C.__custom && C.wep !== undefined) S.weapon = clamp(C.wep, 0, WEAPONS.length - 1);
+
+    S.enemies = []; S.bullets = []; S.parts = []; S.floats = [];
+    // 终章不能反击，只能硬穿 —— 所以那一章的血条更长。
+    // 另外：同一章连续失败 3 次就加一点血上限（最多 +2）。本喵看不到人怎么玩，
+    // 那就把台阶递过去，而不是继续猜"应该多难"。
+    if (S.failsFor !== S.chapter) { S.failsFor = S.chapter; S.fails = 0; }
+    S.mercy = Math.min(2, Math.floor((S.fails || 0) / 3));
+    S.maxHp = (C.finale || C.infinite ? 5 : MAX_HP) + S.mercy;   // 终章和无限都给 5 心
+    S.hp = S.maxHp; S.invuln = 0;
+    S.chapterKilled = 0; S.chapterNeed = C.need || 0;
+    S.chapterT = 0; S.goalHit = false;
+    S.goal = C.goal ? { x: C.goal[0], y: C.goal[1], w: C.goal[2], h: C.goal[3] } : null;
+    S.spawnT = 30; S.chapterBreak = 0; S.chapterDone = false;
+    S.runKills = 0; S.runT = 0; S.deaths = 0;
+    S.pulse.cd = 0; S.pulse.fx = 0;
+    S.banner = null; S.bannerT = 0;
+    S.shake = 0; S.flash = 0; S.hitstop = 0;
+    S.worldFrozen = false; S.freezeFx = 0;
+    S.ch = freshPlayer();
+    S.field.x = W / 2; S.field.y = 300; S.field.r = R_BASE; S.field.hold = 0;
+    S.plats = (C.plats || []).map(function (p) {
+      return { x: p[0], y: p[1], w: p[2], h: p[3] || 18, t: 'plat' };
+    });
+    S.items = (C.items || []).map(function (it, k) {
+      return { t: it[0], x: it[1], y: it[2], got: false, ph: k * 1.37 };
+    });
+    S.shield = 0; S.breathe = 0;
+    S.door = C.finale ? { x: W - 86, y: FLOOR - 112, w: 74, h: 112, open: false, glow: 0, charge: 0, near: false } : null;
+    // 第 13 章：背景那只巨物。核心是一只常驻的敌人（血 = boss 血），
+    // 平时收在本体里（无敌），每隔一阵子落到某个平台上，那才是能打的时候。
+    S.warns = [];
+    S.boss = null; S.bossCore = null;
+    S.wave = 1; S.waveT = WAVE_FRAMES; S.breath = false;
+    if (C.infinite) infSetupWave(1);
+    if (C.win === 'boss') {
+      S.boss = { hp: TYPES.core.hp, maxhp: TYPES.core.hp, phase: 1, t: 0,
+                 up: false, upT: 0, restT: 200, cx: W / 2, cy: 146, tx: W / 2, ty: 146,
+                 fireT: 150, rockT: 320, dead: false, flash: 0 };
+      S.bossCore = makeEnemy('core', W / 2 - 29, 146 - 29, S.chapter);
+      S.bossCore.shield = true;
+      S.enemies.push(S.bossCore);
+    }
+    if (C.finale) {
+      // 从最左边出发：整条路都得空着手走过去
+      S.ch.x = 40;
+      // 全摆在路面上挡道 —— 摆在天上会被直接跑过去
+      var seed = ['crawler', 'charger', 'floater', 'shooter'];
+      for (var q = 0; q < seed.length; q++) {
+        var T = TYPES[seed[q]];
+        S.enemies.push(makeEnemy(seed[q], 200 + q * 150, FLOOR - T.h, S.chapter));
+      }
+    }
+    S.mode = booting ? 'title' : 'intro';
+    S.introT = 0;
+    S.clearT = 0;
+    S.over = 0;
+    S.endingT = 0;
+    if (!booting) { Music.start(); Music.update(0); }
+  }
+
+  // 通关的瞬间，时间停了。
+  // 这是这个游戏里唯一一次你可以不设防的时刻 —— 因为你已经赢了。
+  function freezeWorld() {
+    if (S.worldFrozen) return;
+    S.worldFrozen = true;
+    S.freezeFx = 1;
+    S.invuln = 99999;
+    S.bullets = [];
+    S.field.hold = 0;
+    for (var i = 0; i < S.enemies.length; i++) {
+      var e = S.enemies[i];
+      if (e.dead) continue;
+      e.held = true;                       // 全部就地变成石头
+      e.live = false;
+      e.vx = 0; e.vy = 0; e.dmgT = 0;
+      for (var k = 0; k < 5; k++) {
+        S.parts.push({
+          x: e.x + rnd(0, e.w), y: e.y + rnd(0, e.h),
+          vx: rnd(-1.4, 1.4), vy: rnd(-2.4, 0), life: rnd(24, 52), max: 52,
+          c: PAL.cy, s: rnd(1.5, 3)
+        });
+      }
+    }
+    S.shake = 8;
+    Sound.freeze();
+    S.floats.push({ s: '时间停了', x: S.ch.x + PW / 2, y: S.ch.y - 34, t: 100, c: PAL.cy });
+  }
+
+  function chapterClear() {
+    if (S.chapterDone) return;
+    // 万一同一帧里死亡判定先落了地，通关要把它扳回来 —— 目标是达成了的
+    if (S.mode === 'over') { S.mode = 'play'; S.over = 0; S.hp = 1; }
+    S.fails = 0;                 // 过了就清零，保底不会跟着你一路白送
+    S.chapterDone = true;
+    S.chapterBreak = 90;
+    freezeWorld();
+    banner(chapLabel() + '  通过', PAL.mint);
+    Sound.wave();
+  }
+
+  function finishGame() {
+    S.mode = 'ending';
+    S.endingT = 0;
+    unlock('ending');
+  }
+
+  // ══════════════════════════════════════════════════════════════
+  //  8 · 角色
+  // ══════════════════════════════════════════════════════════════
+  // 重开当前章
+  function resetRun() { startChapter(S.chapter); }
+
+  function hurt(dmg, fromX) {
+    if (S.invuln > 0 || S.mode !== 'play' || S.worldFrozen) return;
+    // 护盾先碎
+    if (S.shield > 0) {
+      S.shield--;                                     // 挡一次，掉一层
+      S.invuln = INVULN;
+      S.shake = 9; S.flash = .35;
+      Sound.freeze();
+      S.floats.push({ s: '护盾碎了', x: S.ch.x + PW / 2, y: S.ch.y - 22, t: 62, c: PAL.cy });
+      for (var q = 0; q < 20; q++) {
+        var a2 = (q / 20) * 6.2832;
+        S.parts.push({
+          x: S.ch.x + PW / 2, y: S.ch.y + PH / 2,
+          vx: Math.cos(a2) * rnd(3, 7), vy: Math.sin(a2) * rnd(3, 7),
+          life: rnd(14, 28), max: 28, c: PAL.cy, s: rnd(2, 3.5)
+        });
+      }
+      return;
+    }
+    S.hp -= (dmg || 1);
+    S.invuln = INVULN;
+    S.shake = 12; S.flash = .8; S.hitstop = 7;
+    Sound.hurt();
+    var ch = S.ch;
+    ch.vx = (ch.x + ch.w / 2 < fromX ? -1 : 1) * 7;
+    ch.vy = -6.5;
+    for (var i = 0; i < 22; i++) {
+      S.parts.push({ x: ch.x + PW / 2, y: ch.y + PH / 2, vx: rnd(-6, 6), vy: rnd(-7, 2), life: rnd(18, 38), max: 38, c: i % 2 ? PAL.red : PAL.pink, s: rnd(2, 4) });
+    }
+    if (S.hp <= 0) {
+      // 目标已经达成了 —— 别让同一帧的伤害把胜利吃掉（两个方向都要堵）
+      if (!isFinale() && goalMet()) { S.hp = 1; chapterClear(); return; }
+      if (isFinale() && S.door && S.door.open && aabb(S.ch, S.door)) { S.hp = 1; return; }
+      S.hp = 0;
+      S.mode = 'over';
+      S.over = 0;
+      if (S.failsFor !== S.chapter) { S.failsFor = S.chapter; S.fails = 0; }
+      S.fails++;
+      Sound.over();
+      S.shake = 20;
+      var sv = Save.get();
+      if (S.runKills > (sv.bestKill || 0)) sv.bestKill = S.runKills;
+      sv.totalKill = (sv.totalKill || 0) + S.runKills;
+      sv.deaths = (sv.deaths || 0) + 1;
+      Save.flush();
+    }
+  }
+
+  function killEnemy(e, byPulse) {
+    if (e.T.boss) { bossDown(); return; }   // 那只眼睛不是「一只怪」，是 boss 的血条
+    e.dead = true;
+    S.kills++; S.runKills++;
+    S.chapterKilled++;
+    rollDrop(e.x + e.w / 2, e.y + e.h / 2);
+    addCoins(e.T.cost || 1);            // 越硬的敌人越值钱
+    tutSet(2);                          // 第一次击杀 → 教学进入收尾
+    if (e.T.noFreeze) unlock('spike');
+    if (S.field.r <= R_BASE * R_FLOOR + 4) unlock('squeeze');
+    Sound.kill();
+    // 刚好打够数 → 当场定格。
+    // 不能等到这一帧末尾再判定：那时另一只敌人的伤害已经先一步把玩家打死了。
+    if (!isFinale() && !S.chapterDone && goalMet()) chapterClear();
+    var sv = Save.get();
+    if ((sv.totalKill || 0) + S.runKills >= 100) unlock('k100');
+    var n = byPulse ? 16 : 10;
+    for (var i = 0; i < n; i++) {
+      S.parts.push({
+        x: e.x + e.w / 2, y: e.y + e.h / 2,
+        vx: rnd(-5, 5), vy: rnd(-6, 2), life: rnd(16, 34), max: 34,
+        c: e.T.noFreeze ? PAL.red : hsl(e.T.hue, 80, 62), s: rnd(2, 4.5)
+      });
+    }
+    if (byPulse) {
+      S.pulseKills++;
+      if (S.pulseKills >= 4) unlock('pulse4');
+    }
+  }
+
+  // 脉冲击杀计数：每次脉冲开始时清零，脉冲结束后判定
+  function firePulse() {
+    if (!has('pulse') || S.pulse.cd > 0 || S.mode !== 'play') return;
+    var wep = WEP();
+    S.pulse.cd = wep.cd;
+    var f = S.field;
+    var R = R_BASE * wep.rPulse;           // 脉冲范围固定，不受缩圈影响
+    S.pulse.fx = 1;
+    S.pulseKills = 0;
+    S.shake = 8;
+    Sound.pulse();
+    var hits = 0;
+    for (var i = 0; i < S.enemies.length; i++) {
+      var e = S.enemies[i];
+      if (e.dead) continue;
+      var d = dist(e.x + e.w / 2, e.y + e.h / 2, f.x, f.y);
+      if (d > R + Math.max(e.w, e.h) / 2) continue;
+      // 「不化」只吃脉冲，而且得是砸得动它的那把 ——「撒手」连推都推不动它
+      if (e.T.noFreeze && !wep.spikeKill) continue;
+      if (e.shield) continue;              // 收在本体里的眼睛打不动
+      hits++;
+      e.hp -= wep.pdmg;
+      e.flash = 12;
+      var ang = Math.atan2(e.y + e.h / 2 - f.y, e.x + e.w / 2 - f.x) || 0;
+      e.vx += Math.cos(ang) * PULSE_KNOCK;
+      e.vy += Math.sin(ang) * PULSE_KNOCK - 3;
+      if (e.hp <= 0) killEnemy(e, true);
+    }
+    for (var p = 0; p < 40; p++) {
+      var a = (p / 40) * 6.2832;
+      S.parts.push({
+        x: f.x + Math.cos(a) * R * .7, y: f.y + Math.sin(a) * R * .7,
+        vx: Math.cos(a) * rnd(4, 9), vy: Math.sin(a) * rnd(4, 9),
+        life: rnd(14, 26), max: 26, c: PAL.cy, s: rnd(2, 4)
+      });
+    }
+  }
+
+  // ══════════════════════════════════════════════════════════════
+  //  9 · 敌人 AI（只在「场内」运行）
+  // ══════════════════════════════════════════════════════════════
+  function shoot(e, tx, ty) {
+    var cx = e.x + e.w / 2, cy = e.y + e.h / 2;
+    var a = Math.atan2(ty - cy, tx - cx);
+    S.bullets.push({ x: cx, y: cy, vx: Math.cos(a) * BULLET_SP, vy: Math.sin(a) * BULLET_SP, r: 5, live: true, life: 420, t: 0 });
+    Sound.ui();
+  }
+
+  // 僵直期间只落地，不追人
+  function aiPhysicsOnly(e) {
+    if (!e.T.fly) {
+      e.vy = Math.min(e.vy + GRAV, MAXFALL);
+      e.y += e.vy;
+      e.grounded = false;
+      if (e.y + e.h >= FLOOR) { e.y = FLOOR - e.h; e.vy = 0; e.grounded = true; }
+    }
+    e.vx *= .8;
+    e.x = clamp(e.x + e.vx, -90, W + 90 - e.w);
+    e.bob += .05;
+  }
+
+  function aiLive(e, ch) {
+    var T = e.T;
+    var cx = e.x + e.w / 2, cy = e.y + e.h / 2;
+    var px = ch.x + PW / 2, py = ch.y + PH / 2;
+
+    if (e.type === 'charger') {
+      e.chargeT--;
+      if (e.chargeState === 0) {                       // 靠近
+        var dir0 = px > cx ? 1 : -1;
+        e.face = dir0;
+        e.vx = lerp(e.vx, dir0 * T.sp, .12);
+        if (Math.abs(px - cx) < 340 && Math.abs(py - cy) < 110) { e.chargeState = 1; e.chargeT = 34; }
+      } else if (e.chargeState === 1) {                // 蓄力（给玩家反应时间）
+        e.vx = lerp(e.vx, 0, .2);
+        if (e.chargeT <= 0) { e.chargeState = 2; e.chargeT = 34; e.vx = e.face * 9.4; Sound.freeze(); }
+      } else if (e.chargeState === 2) {                // 冲
+        e.vx = e.face * 9.4;
+        if (e.chargeT <= 0) { e.chargeState = 3; e.chargeT = 44; }
+      } else {                                          // 硬直
+        e.vx = lerp(e.vx, 0, .18);
+        if (e.chargeT <= 0) e.chargeState = 0;
+      }
+    } else if (T.fly) {
+      var ang = Math.atan2(py - cy, px - cx);
+      var sp = T.sp;
+      if (e.type === 'shooter') {
+        var d = dist(cx, cy, px, py);
+        if (d < 190) { ang += Math.PI; sp = T.sp * 1.5; }
+        else if (d < 300) sp = T.sp * .25;
+        e.shootT--;
+        if (e.shootT <= 0) { e.shootT = T.shoot; shoot(e, px, py); }
+      }
+      e.vx = lerp(e.vx, Math.cos(ang) * sp, .075);
+      e.vy = lerp(e.vy, Math.sin(ang) * sp, .075);
+      e.face = e.vx > 0 ? 1 : -1;
+    } else {
+      var dir = px > cx ? 1 : -1;
+      e.face = dir;
+      e.vx = lerp(e.vx, dir * T.sp, .13);
+      if (e.grounded && Math.abs(px - cx) < 46 && ch.y + PH < e.y - 8) e.vy = -11.4;
+    }
+
+    // 位移
+    if (!T.fly) e.vy = Math.min(e.vy + GRAV, MAXFALL);
+    var nx = e.x + e.vx, ny = e.y + e.vy;
+
+    // 地面单位撞上冻住的石台 → 跳过去，否则停下
+    if (!T.fly) {
+      var probe = { x: nx, y: e.y, w: e.w, h: e.h };
+      var blocked = false;
+      for (var i = 0; i < S.enemies.length; i++) {
+        var o = S.enemies[i];
+        if (o === e || o.live || o.dead) continue;
+        if (aabb(probe, o)) { blocked = true; break; }
+      }
+      if (blocked) {
+        e.vx *= .2;
+        if (e.grounded) e.vy = -10.6;
+        nx = e.x + e.vx;
+      }
+    }
+
+    e.x = clamp(nx, -90, W + 90 - e.w);
+    var prevBottom = e.y + e.h;
+    e.y = ny;
+    e.grounded = false;
+    var gy = FLOOR;
+    if (!T.fly) {
+      for (var pi = 0; pi < S.plats.length; pi++) {
+        var pf = S.plats[pi];
+        if (e.x + e.w < pf.x + 6 || e.x > pf.x + pf.w - 6) continue;   // 得站在板子上方
+        if (prevBottom <= pf.y + 4 && e.y + e.h >= pf.y && pf.y < gy) gy = pf.y;
+      }
+    }
+    if (e.y + e.h >= gy) { e.y = gy - e.h; e.vy = 0; e.grounded = true; }
+    if (e.y < CEIL) { e.y = CEIL; e.vy = Math.abs(e.vy) * .3; }
+    e.bob += .08;
+  }
+
+  function crumble(e) {
+    for (var i = 0; i < 12; i++) {
+      S.parts.push({
+        x: e.x + rnd(0, e.w), y: e.y + rnd(0, e.h),
+        vx: rnd(-2.5, 2.5), vy: rnd(-4, .5), life: rnd(18, 40), max: 40,
+        c: i % 3 ? PAL.stone : PAL.stoneRim, s: rnd(2, 5)
+      });
+    }
+  }
+
+  function updateEnemies() {
+    var ch = S.ch, f = S.field;
+    var heldCount = 0;
+
+    for (var i = S.enemies.length - 1; i >= 0; i--) {
+      var e = S.enemies[i];
+      if (e.dead) { S.enemies.splice(i, 1); continue; }
+      if (e.spawnFx > 0) e.spawnFx--;
+      if (e.flash > 0) e.flash--;
+
+      var cx = e.x + e.w / 2, cy = e.y + e.h / 2;
+
+      // 「不化」钉不住 —— 它只能靠脉冲砸碎
+      var wasHeld = e.held;
+      var wep = WEP();
+      var inField = dist(cx, cy, f.x, f.y) <= f.r + Math.max(e.w, e.h) * 0.22;
+      // 能不能攥看武器；「不化」只有 spike 武器按得住（现在三把都没有）
+      // !! 是必需的：字段缺失时表达式会算出 undefined 而不是 false，
+      // 行为上都是假值，但 held === false 这类严格判断会莫名其妙地挂。
+      e.held = !!(inField && wep.canHold && (!e.T.noFreeze || wep.spike));
+      e.inField = inField;
+      e.live = !e.held;
+
+      if (e.held && !wasHeld) {
+        e.vx = 0; e.vy = 0;
+        Sound.freeze();
+        if (!e.wasHeld) { e.wasHeld = true; unlock('first'); }
+      } else if (!e.held && wasHeld) {
+        Sound.thaw();
+      }
+
+      if (e.held) { heldCount++; e.vx = 0; e.vy = 0; }   // 被钉死在原地
+      // 灼烧三条件：这把武器烧不烧 · 「不化」一律不烧（它只吃脉冲）·
+      // 以及「钉住的会烧；攥不住的武器（撒手）则圈里的都烧」
+      var burning = !e.shield && wep.burnField && !e.T.noFreeze && (e.held || (e.inField && !wep.canHold));
+      e.burning = burning;      // 渲染要靠它画血条
+      if (burning) {
+        e.dmgT = (e.dmgT || 0) + 1;
+        var every = FIELD_DMG_EVERY / wep.dmgMul;      // 伤害倍率越高，掉血越密
+        if (e.dmgT >= every) {
+          e.dmgT -= every;
+          e.hp--;
+          e.flash = 5;
+          if (e.hp <= 0) { killEnemy(e, false); continue; }
+        }
+      }
+      if (!e.held) {
+        if (!e.T.boss) {
+          aiLive(e, ch);
+          if (S.invuln <= 0 && S.mode === 'play' && aabb(ch, e)) hurt(1, cx);
+        }
+      }
+    }
+
+    S.field.hold = heldCount;
+    if (heldCount > 0) tutSet(1);          // 第一次攥住 → 教学往下走一步
+    if (heldCount >= 8) unlock('wall8');
+    if (heldCount > 0 && isFinale()) S.finaleClean = false;
+  }
+
+  function updateBullets() {
+    var ch = S.ch;
+    for (var i = S.bullets.length - 1; i >= 0; i--) {
+      var b = S.bullets[i];
+      b.t++;
+      b.live = true;              // 已经射出来的东西不受时间场影响 —— 射手因此永远有威胁
+      b.x += b.vx; b.y += b.vy;
+      if (b.x < -30 || b.x > W + 30 || b.y < -30 || b.y > H + 30 || b.t > b.life) { S.bullets.splice(i, 1); continue; }
+      if (S.invuln <= 0 && S.mode === 'play' &&
+          b.x > ch.x - b.r && b.x < ch.x + ch.w + b.r && b.y > ch.y - b.r && b.y < ch.y + ch.h + b.r) {
+        S.bullets.splice(i, 1);
+        hurt(1, b.x);
+      }
+    }
+  }
+
+  // ══════════════════════════════════════════════════════════════
+  // 10 · 玩家物理
+  // ══════════════════════════════════════════════════════════════
+  // 敌人不构成地形，场地里只有四堵墙
+  // 每帧只算一次。原来 updateItems 把这个函数放在了道具循环【里面】——
+  // 场上有几个道具就重建几次数组、几十个对象，全是喂给 GC 的垃圾。
+  var _boxCache = null, _boxT = -1;
+  function solidBoxes() {
+    if (_boxT === S.t && _boxCache) return _boxCache;
+    var out = [
+      { x: 0, y: FLOOR, w: W, h: 90, t: 'wall' },
+      { x: -70, y: 0, w: 70, h: H, t: 'wall' },
+      { x: W, y: 0, w: 70, h: H, t: 'wall' },
+      { x: 0, y: -80, w: W, h: 80 + CEIL, t: 'wall' }
+    ];
+    for (var i = 0; i < S.plats.length; i++) out.push(S.plats[i]);
+    _boxT = S.t; _boxCache = out;
+    return out;
+  }
+
+  function itemAt(x, y) {
+    for (var i = 0; i < S.items.length; i++) {
+      var it = S.items[i];
+      if (it.got) continue;
+      if (it.cool > 0) continue;          // 刚蹦出来的先别急着吃
+      if (Math.abs(x - it.x) < 26 && Math.abs(y - it.y) < 30) return it;
+    }
+    return null;
+  }
+
+  function collideX(boxes) {
+    var ch = S.ch;
+    for (var i = 0; i < boxes.length; i++) {
+      var b = boxes[i];
+      if (b.t === 'plat') continue;          // 跳台不挡横向，从旁边可以直接走进去
+      if (!aabb(ch, b)) continue;
+      var ox = ovX(ch, b);
+      if (ox <= 0) continue;
+      ch.x += (ch.vx > .01) ? -ox : (ch.vx < -.01 ? ox : ((ch.x + ch.w / 2 < b.x + b.w / 2) ? -ox : ox));
+      ch.vx = 0;
+    }
+  }
+  function collideY(boxes) {
+    var ch = S.ch;
+    for (var i = 0; i < boxes.length; i++) {
+      var b = boxes[i];
+      // 单向跳台：往上跳的时候穿过去，只有下落且上一帧还在板子上方才踩得住。
+      // 这就是治「站在正下方跳不上去」的标准解法。
+      if (b.t === 'plat') {
+        if (ch.dropT > 0 && b === ch.dropFrom) continue;   // 正从这块板上往下跳，放行
+        if (ch.vy <= 0) continue;
+        if ((ch.prevBottom === undefined ? ch.y + ch.h : ch.prevBottom) > b.y + 6) continue;
+      }
+      if (!aabb(ch, b)) continue;
+      var oy = ovY(ch, b);
+      if (oy <= 0) continue;
+      if (ch.vy > .01) {
+        ch.y -= oy;
+        ch.grounded = true; ch.ground = b; ch.coyote = COYOTE;
+        if (ch.vy > 6) { ch.sq = .76; ch.sqx = 1.24; ch.landT = 8; Sound.land(); }
+        ch.vy = 0;
+      } else if (ch.vy < -.01) {
+        ch.y += oy; ch.vy = 0;
+      } else {
+        ch.y -= oy; ch.grounded = true; ch.ground = b; ch.coyote = COYOTE;
+      }
+    }
+  }
+
+  var keys = {};
+  function K(k) { return !!keys[k]; }
+
+  // 你攥着的东西是有重量的：空着手比所有敌人都快，攥满了就退回原速。
+  // 于是「打」和「跑」变成一个真实的取舍 —— 也是终章唯一的活路。
+  function moveSpeed() {
+    // 「喘息」期间攥住不算数 —— 那是这套规则唯一的免罚时刻
+    var held = S.breathe > 0 ? 0 : (S.field.hold || 0);
+    var light = 1 - Math.min(held, 5) / 5;
+    return MOVE * (1 + 0.46 * light);
+  }
+
+  function updatePlayer() {
+    var ch = S.ch;
+    if (!ch) return;
+
+    var L = K('ArrowLeft') || K('a') || K('A');
+    var R = K('ArrowRight') || K('d') || K('D');
+    var U = K('ArrowUp') || K('w') || K('W');
+    var D = K('ArrowDown') || K('s') || K('S');
+    var J = K(' ') || K('Spacebar') || U || K('j') || K('J');   // W / ↑ 也是跳（README 早就这么写了，只是代码没接上）
+
+    var spd = moveSpeed();
+    var acc = ch.grounded ? 1 : .46;
+    if (L && !R) { ch.vx -= spd * acc * .36; ch.face = -1; }
+    else if (R && !L) { ch.vx += spd * acc * .36; ch.face = 1; }
+    else { ch.vx *= ch.grounded ? FRIC : .93; if (Math.abs(ch.vx) < .08) ch.vx = 0; }
+    ch.vx = clamp(ch.vx, -spd, spd);
+
+    if (J && !ch.wasJump) ch.buf = BUFFER;
+    ch.wasJump = J;
+    if (ch.buf > 0) ch.buf--;
+    if (ch.buf > 0 && ch.coyote > 0) {
+      ch.vy = -JUMP; ch.buf = 0; ch.coyote = 0; ch.grounded = false;
+      ch.jumpHold = 12; ch.sq = 1.3; ch.sqx = .74;
+      Sound.jump();
+      for (var p = 0; p < 6; p++) S.parts.push({ x: ch.x + PW / 2, y: ch.y + PH, vx: rnd(-2, 2), vy: rnd(-1, 2), life: 15, max: 15, c: PAL.dim, s: rnd(1.5, 3) });
+    }
+    if (ch.jumpHold > 0) { ch.jumpHold--; if (!J && ch.vy < -5) { ch.vy *= .5; ch.jumpHold = 0; } }
+
+    // 下跳：站在跳台上按 S / ↓ 直接穿下去。
+    // 单向跳台的标准搭档 —— 不然下了台就只能走到边缘掉下去。
+    if (ch.dropT > 0) { ch.dropT--; if (ch.dropT === 0) ch.dropFrom = null; }
+    if (has('drop') && D && !ch.wasDown && ch.grounded && ch.ground && ch.ground.t === 'plat') {
+      ch.dropFrom = ch.ground;
+      ch.dropT = 16;                      // 十几帧够穿过 18px 厚的板子
+      ch.grounded = false; ch.ground = null; ch.coyote = 0;
+      ch.vy = Math.max(ch.vy, 1.5);       // 往下蹭一下，手感才跟得上按键
+      for (var q = 0; q < 5; q++) S.parts.push({ x: ch.x + PW / 2, y: ch.y + PH, vx: rnd(-1.6, 1.6), vy: rnd(-1.4, .4), life: 14, max: 14, c: PAL.dim, s: rnd(1.2, 2.4) });
+      Sound.land();
+    }
+    ch.wasDown = D;
+
+    ch.vy = Math.min(ch.vy + GRAV, MAXFALL);
+
+    var boxes = solidBoxes();
+    ch.x += ch.vx;
+    collideX(boxes);
+    ch.grounded = false; ch.ground = null;
+    ch.prevBottom = ch.y + ch.h;            // 单向跳台要用上一帧的脚底位置
+    ch.y += ch.vy;
+    collideY(boxes);
+
+    if (ch.grounded) ch.coyote = COYOTE; else if (ch.coyote > 0) ch.coyote--;
+
+    if (Math.abs(ch.vx) > .6 && ch.grounded) {
+      ch.walkT += Math.abs(ch.vx) * .1;
+      ch.stepT++;
+      if (ch.stepT % 12 === 0) Sound.land();
+    } else if (!ch.grounded) ch.walkT += .05;
+    ch.sq = lerp(ch.sq, 1, .2); ch.sqx = lerp(ch.sqx, 1, .2);
+    if (ch.landT > 0) ch.landT--;
+    ch.blinkT--; if (ch.blinkT <= 0) { ch.blink = 8; ch.blinkT = 90 + Math.floor(Math.random() * 140); }
+    if (ch.blink > 0) ch.blink--;
+
+    if (S.invuln > 0) S.invuln--;
+  }
+
+  // ══════════════════════════════════════════════════════════════
+  // 11 · 主更新
+  // ══════════════════════════════════════════════════════════════
+  function updatePlay() {
+    var f = S.field;
+    if (S.pulse.cd > 0) S.pulse.cd--;
+    if (S.pulse.fx > 0) S.pulse.fx = Math.max(0, S.pulse.fx - .08);
+
+    S.runT++;
+    f.pl += .012;
+
+    // 通关后世界定格：不再更新角色、敌人、子弹 —— 只跑特效
+    if (!S.worldFrozen) {
+      updatePlayer();
+
+      // 时间场用鼠标瞄 —— 它是你能施加影响的全部范围，本身不提供任何保护。
+      // 每钉住一个敌人，圈就小一圈：你攥住的东西越多，你能攥住的越少。
+      f.x = lerp(f.x, clamp(S.mouse.x, 34, W - 34), .30);
+      f.y = lerp(f.y, clamp(S.mouse.y, CEIL - 6, FLOOR - 12), .30);
+
+      updateEnemies();
+      updateItems();
+      // 教学那行字，学会后再挂 8 秒就收起来
+      if (tutStage() === 2) { S.tutT++; if (S.tutT > 500) tutSet(3); }
+
+      // 道具：走过去就吃到
+      var pick = itemAt(S.ch.x + PW / 2, S.ch.y + PH / 2);
+      if (pick) { pick.got = true; applyItem(pick.t, pick.x, pick.y); }
+
+      // 喘息：攥住不算数
+      var effHold = S.breathe > 0 ? 0 : S.field.hold;
+      Music.update(effHold);              // 攥得越多，声音越闷
+
+      var target = R_BASE * WEP().rMul * Math.max(R_FLOOR, 1 - effHold * R_SHRINK);
+      f.r = lerp(f.r, target, R_LERP);
+
+      updateBullets();
+    }
+    if (S.breathe > 0) S.breathe--;
+
+    // ── 章节推进 ──
+    if (S.chapterBreak > 0) {
+      S.chapterBreak--;
+      if (S.chapterBreak === 0) {
+        // 自制关永远走「通关」页，不走结局 —— 它只是临时挂在表末尾的一张卡。
+        // 上面 advanceClear 里堵过一次，这里是【另一条】通往结局的路，别再漏。
+        if (!isCustomRun() && S.chapter >= CHAPTERS.length - 1) finishGame();
+        else { S.mode = 'clear'; S.clearT = 0; }
+      }
+    } else if (isFinale()) {
+      // 终章：走到门口、空着手、撑住三秒 —— 门才开。
+      // 这三秒里你没有还手能力，只能躲。
+      spawnTick();
+      var d = S.door;
+      var px2 = S.ch.x + PW / 2;
+      d.near = Math.abs(px2 - (d.x + d.w / 2)) < 290;
+      var charging = d.near && S.field.hold === 0;
+      d.charge = clamp((d.charge || 0) + (charging ? 1 / 130 : -1 / 95), 0, 1);
+      d.open = d.charge >= 1;
+      d.glow = lerp(d.glow, d.open ? 1 : d.charge, .14);
+      if (charging && d.charge > 0 && S.t % 12 === 0) Sound.tick();
+      if (d.open && aabb(S.ch, d)) {
+        S.chapterDone = true; S.chapterBreak = 90;
+        freezeWorld();
+        banner('真的结束了吗？', PAL.red); Sound.wave();
+        if (S.finaleClean) unlock('nohold');
+      }
+    } else {
+      S.chapterT++;
+      if (S.boss) updateBoss();
+      if (CHAPTER().infinite) updateWaves();
+      if (S.warns.length) updateWarns();
+      if (S.goal && !S.goalHit && aabb(S.ch, S.goal)) {
+        // 「爬上去要空出手」—— 攥着东西站到顶上也白站
+        if (!CHAPTER().goalQuiet || S.field.hold === 0) S.goalHit = true;
+      }
+      spawnTick();
+      if (goalMet()) chapterClear();
+    }
+
+    // 粒子
+    for (var i = S.parts.length - 1; i >= 0; i--) {
+      var p = S.parts[i];
+      p.x += p.vx; p.y += p.vy; p.vy += .28; p.vx *= .99;
+      p.life--;
+      if (p.life <= 0) S.parts.splice(i, 1);
+    }
+    if (S.parts.length > 520) S.parts.splice(0, S.parts.length - 520);
+    for (var j = S.floats.length - 1; j >= 0; j--) {
+      var fl = S.floats[j];
+      fl.y -= .55; fl.t--;
+      if (fl.t <= 0) S.floats.splice(j, 1);
+    }
+    if (S.bannerT > 0) S.bannerT--;
+    if (S.freezeFx > 0) S.freezeFx = Math.max(0, S.freezeFx - .015);
+    if (S.shake > .15) S.shake *= .87; else S.shake = 0;
+    if (S.flash > 0) S.flash = Math.max(0, S.flash - .06);
+  }
+
+  function updateEggs() {
+    if (Eggs.cat) {
+      Eggs.cat.x += Eggs.cat.vx;
+      Eggs.cat.t++;
+      if (Eggs.cat.x > W + 80 || Eggs.cat.x < -80) Eggs.cat = null;
+    }
+    if (Eggs.glitch > 0) Eggs.glitch--;
+    if (Eggs.msgT > 0) Eggs.msgT--; else Eggs.msg = null;
+    for (var a = achQ.length - 1; a >= 0; a--) { achQ[a].t++; if (achQ[a].t > 200) achQ.splice(a, 1); }
+  }
+
+  function spawnCat() {
+    if (Eggs.cat) return;
+    Eggs.cat = { x: -70, vx: 1.6, t: 0 };
+    unlock('cat');
+    Sound.secret();
+  }
+
+  function checkKonami(k) {
+    Eggs.konamiBuf.push(k);
+    if (Eggs.konamiBuf.length > KONAMI.length) Eggs.konamiBuf.shift();
+    if (Eggs.konamiBuf.length === KONAMI.length) {
+      var ok = true;
+      for (var i = 0; i < KONAMI.length; i++)
+        if (String(Eggs.konamiBuf[i]).toLowerCase() !== String(KONAMI[i]).toLowerCase()) { ok = false; break; }
+      if (ok) {
+        Eggs.rainbow = !Eggs.rainbow;
+        unlock('konami');
+        Eggs.konamiBuf = [];
+        Eggs.msg = Eggs.rainbow ? '彩虹模式' : '彩虹关闭';
+        Eggs.msgT = 90;
+      }
+    }
+  }
+
+  function decayFx() {
+    for (var i = S.parts.length - 1; i >= 0; i--) {
+      var p = S.parts[i];
+      p.x += p.vx; p.y += p.vy; p.vy += .28; p.vx *= .99; p.life--;
+      if (p.life <= 0) S.parts.splice(i, 1);
+    }
+    for (var j = S.floats.length - 1; j >= 0; j--) {
+      var fl = S.floats[j];
+      fl.y -= .55; fl.t--;
+      if (fl.t <= 0) S.floats.splice(j, 1);
+    }
+    if (S.bannerT > 0) S.bannerT--;
+    if (S.freezeFx > 0) S.freezeFx = Math.max(0, S.freezeFx - .015);
+    if (S.shake > .15) S.shake *= .87; else S.shake = 0;
+    if (S.flash > 0) S.flash = Math.max(0, S.flash - .06);
+  }
+
+  function step() {
+    Save.tick();   // 存盘攒够了才落盘（见 Save.later）
+    // F8 打开后记录每帧耗时（保留最近 120 帧），用来抓卡顿的【峰值】而不是平均
+    if (S.showFps) {
+      var _n = (typeof performance !== 'undefined' && performance.now) ? performance.now() : Date.now();
+      if (S._last) { S._ft.push(_n - S._last); if (S._ft.length > 120) S._ft.shift(); }
+      S._last = _n;
+    } else S._last = 0;
+    S.t++;
+    if (S.mode === 'play') updatePlay();
+    else if (S.mode === 'title') { S.bootT++; decayFx(); }
+    else if (S.mode === 'select') { S.selT++; decayFx(); }
+    else if (S.mode === 'intro') { S.introT++; decayFx(); }
+    else if (S.mode === 'pause') { S.pauseT++; }
+    else if (S.mode === 'clear') { S.clearT++; decayFx(); }
+    else if (S.mode === 'over') { S.over++; decayFx(); }
+    else if (S.mode === 'ending') { S.endingT++; decayFx(); }
+    updateEggs();
+  }
+
+  // ══════════════════════════════════════════════════════════════
+  // 12 · 绘制
+  // ══════════════════════════════════════════════════════════════
+  var canvas = null, ctx = null;
+
+  // ── 静态图层预烘焙 ──
+  // 背景网格和暗角每帧都一样，没必要每帧现造全屏渐变（低配机上这是纯浪费）
+  var bgLayer = null, vgLayer = null;
+  function bakeLayers() {
+    try {
+      bgLayer = document.createElement('canvas');
+      bgLayer.width = W; bgLayer.height = H;
+      var b = bgLayer.getContext('2d');
+      if (!b) { bgLayer = null; throw 0; }
+      var g = b.createLinearGradient(0, 0, W * .3, H);
+      g.addColorStop(0, PAL.bg0); g.addColorStop(1, PAL.bg1);
+      b.fillStyle = g; b.fillRect(0, 0, W, H);
+      b.strokeStyle = 'rgba(90,140,220,.045)'; b.lineWidth = 1;
+      b.beginPath();
+      for (var x = 0; x <= W; x += 48) { b.moveTo(x + .5, 0); b.lineTo(x + .5, H); }
+      for (var y = 0; y <= H; y += 48) { b.moveTo(0, y + .5); b.lineTo(W, y + .5); }
+      b.stroke();
+    } catch (e) { bgLayer = null; }
+
+    try {
+      vgLayer = document.createElement('canvas');
+      vgLayer.width = W; vgLayer.height = H;
+      var v = vgLayer.getContext('2d');
+      if (!v) { vgLayer = null; throw 0; }
+      var vg = v.createRadialGradient(W / 2, H / 2, H * .34, W / 2, H / 2, H * .98);
+      vg.addColorStop(0, 'rgba(0,0,0,0)'); vg.addColorStop(1, 'rgba(0,0,0,.62)');
+      v.fillStyle = vg; v.fillRect(0, 0, W, H);
+    } catch (e) { vgLayer = null; }
+  }
+
+  // 廉价外发光：一层放大的半透明底。比 shadowBlur 便宜一个数量级。
+  function glow(c, x, y, w, h, r, col, a) {
+    c.globalAlpha = a;
+    c.fillStyle = col;
+    rr(c, x, y, w, h, r); c.fill();
+    c.globalAlpha = 1;
+  }
+
+  function bug(x, y, w, h, r, a) { rr(ctx, x, y, w, h, r); ctx.globalAlpha = a; ctx.fill(); ctx.globalAlpha = 1; }
+
+  function drawBg() {
+    if (bgLayer) { ctx.drawImage(bgLayer, 0, 0); return; }
+    // 兜底：离屏画布不可用时才现画
+    var g = ctx.createLinearGradient(0, 0, W * .3, H);
+    g.addColorStop(0, PAL.bg0); g.addColorStop(1, PAL.bg1);
+    ctx.fillStyle = g;
+    ctx.fillRect(0, 0, W, H);
+    ctx.strokeStyle = 'rgba(90,140,220,.045)';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    for (var x = 0; x <= W; x += 48) { ctx.moveTo(x + .5, 0); ctx.lineTo(x + .5, H); }
+    for (var y = 0; y <= H; y += 48) { ctx.moveTo(0, y + .5); ctx.lineTo(W, y + .5); }
+    ctx.stroke();
+  }
+
+  function drawArena() {
+    ctx.fillStyle = PAL.wall;
+    ctx.fillRect(0, FLOOR, W, H - FLOOR);
+    ctx.fillStyle = PAL.wallTop;
+    ctx.fillRect(0, FLOOR, W, 3);
+    ctx.fillStyle = 'rgba(90,140,220,.10)';
+    for (var x = 0; x < W; x += 48) ctx.fillRect(x, FLOOR + 6, 22, 2);
+    ctx.fillStyle = PAL.wall;
+    ctx.fillRect(0, 0, W, CEIL - 24);
+    ctx.fillRect(0, CEIL - 24, 10, H);
+    ctx.fillRect(W - 10, CEIL - 24, 10, H);
+  }
+
+  // 被时间场钉住的敌人：石头化，边缘有静止纹
+  function drawPlats() {
+    for (var i = 0; i < S.plats.length; i++) {
+      var p = S.plats[i];
+      ctx.globalAlpha = .5;
+      ctx.fillStyle = '#05080f';
+      rr(ctx, p.x + 3, p.y + 5, p.w, p.h, 4); ctx.fill();
+      ctx.globalAlpha = 1;
+      var g = ctx.createLinearGradient(0, p.y, 0, p.y + p.h);
+      g.addColorStop(0, '#2c3752');
+      g.addColorStop(1, '#161d2f');
+      ctx.fillStyle = g;
+      rr(ctx, p.x, p.y, p.w, p.h, 4); ctx.fill();
+      // 顶面亮边：告诉玩家"这里踩得上去"
+      ctx.fillStyle = 'rgba(120,215,255,.8)';
+      ctx.fillRect(p.x + 4, p.y, p.w - 8, 2.5);
+      ctx.strokeStyle = 'rgba(120,170,255,.22)';
+      ctx.lineWidth = 1;
+      rr(ctx, p.x + .5, p.y + .5, p.w - 1, p.h - 1, 4); ctx.stroke();
+    }
+  }
+
+  // 「抵达」型的目标区：一圈会呼吸的光，站进去就算过
+  // 背景里那只巨物。它不动，只有眼睛会走。
+  function drawBoss() {
+    var b = S.boss; if (!b) return;
+    var cx = W / 2, cy = 150;
+    ctx.save();
+    ctx.globalAlpha = b.dead ? .18 : .92;
+    var g = ctx.createRadialGradient(cx, cy, 20, cx, cy, 340);
+    g.addColorStop(0, b.flash > 0 ? 'rgba(255,130,160,.95)' : 'rgba(96,26,70,.98)');
+    g.addColorStop(.5, 'rgba(58,16,46,.9)');
+    g.addColorStop(.82, 'rgba(30,8,26,.55)');
+    g.addColorStop(1, 'rgba(8,5,14,0)');
+    ctx.fillStyle = g;
+    ctx.beginPath(); ctx.ellipse(cx, cy, 330, 205, 0, 0, 6.2832); ctx.fill();
+    ctx.globalAlpha = b.dead ? .08 : .5;
+    ctx.strokeStyle = 'rgba(255,90,130,.4)'; ctx.lineWidth = 2.5;
+    ctx.beginPath(); ctx.ellipse(cx, cy, 330, 205, 0, 0, 6.2832); ctx.stroke();
+    // 两只垂下来的「肩」，让它有个轮廓
+    ctx.globalAlpha = b.dead ? .12 : .8;
+    ctx.fillStyle = 'rgba(42,12,36,.98)';
+    ctx.beginPath(); ctx.ellipse(cx - 236, cy + 78, 150, 118, -.3, 0, 6.2832); ctx.fill();
+    ctx.beginPath(); ctx.ellipse(cx + 236, cy + 78, 150, 118, .3, 0, 6.2832); ctx.fill();
+    ctx.restore();
+
+    if (b.dead) return;
+    // 眼睛还收在本体里的时候，画个暗窝；落下来的时候画一圈红光
+    if (b.up) {
+      var pu = .5 + Math.sin(b.t * .16) * .5;
+      ctx.save();
+      ctx.globalAlpha = .2 + pu * .3;
+      ctx.fillStyle = PAL.red;
+      ctx.beginPath(); ctx.arc(b.cx, b.cy, 62 + pu * 8, 0, 6.2832); ctx.fill();
+      ctx.globalAlpha = .75;
+      ctx.strokeStyle = PAL.red; ctx.lineWidth = 2.5;
+      ctx.beginPath(); ctx.arc(b.cx, b.cy, 54, 0, 6.2832); ctx.stroke();
+      ctx.restore();
+    } else {
+      ctx.save();
+      ctx.globalAlpha = .5;
+      ctx.fillStyle = 'rgba(6,4,10,.9)';
+      ctx.beginPath(); ctx.arc(W / 2, 146, 30, 0, 6.2832); ctx.fill();
+      ctx.restore();
+    }
+  }
+
+  function drawWarns() {
+    for (var i = 0; i < S.warns.length; i++) {
+      var w = S.warns[i], a = 1 - w.t / w.max;
+      ctx.globalAlpha = .10 + a * .28;
+      ctx.fillStyle = PAL.red;
+      ctx.fillRect(w.x - 15, CEIL, 30, FLOOR - CEIL);
+      ctx.globalAlpha = 1;
+    }
+  }
+
+  function drawGoal() {
+    if (!S.goal) return;
+    var g = S.goal, pu = .5 + Math.sin(S.t * .07) * .5;
+    // 站在圈里但手里还攥着东西 → 变红。不然玩家不知道差在哪
+    var blocked = CHAPTER().goalQuiet && S.field.hold > 0 &&
+                  aabb(S.ch, g) ? true : false;
+    var col = blocked ? PAL.red : PAL.mint;
+    ctx.save();
+    ctx.globalAlpha = .13 + pu * .17;
+    ctx.fillStyle = col;
+    rr(ctx, g.x, g.y, g.w, g.h, 9); ctx.fill();
+    ctx.globalAlpha = .45 + pu * .4;
+    ctx.strokeStyle = col; ctx.lineWidth = blocked ? 3 : 2;
+    rr(ctx, g.x + 1, g.y + 1, g.w - 2, g.h - 2, 9); ctx.stroke();
+    ctx.restore();
+  }
+
+  // 正在被烧的敌人头顶挂血条。
+  // 粉丝说「不知道怎么杀」—— 很大一部分是因为烧了半天屏幕上什么都没发生。
+  function drawBars() {
+    for (var i = 0; i < S.enemies.length; i++) {
+      var e = S.enemies[i];
+      if (e.dead || !e.burning || e.hp <= 0) continue;
+      var w = Math.max(28, e.w), x = e.x + e.w / 2 - w / 2, y = e.y - 10;
+      var frac = clamp(e.hp / e.maxhp, 0, 1);
+      ctx.fillStyle = 'rgba(4,8,18,.82)';
+      rr(ctx, x - 1.5, y - 1.5, w + 3, 7, 3.5); ctx.fill();
+      ctx.fillStyle = frac > .5 ? PAL.mint : (frac > .25 ? PAL.gold : PAL.red);
+      rr(ctx, x, y, w * frac, 4, 2); ctx.fill();
+    }
+  }
+
+  function drawItems() {
+    for (var i = 0; i < S.items.length; i++) {
+      var it = S.items[i];
+      if (it.got) continue;
+      var def = ITEMS[it.t] || ITEMS.shield;
+      var bob = Math.sin(S.t * .055 + it.ph) * 4;
+      var x = it.x, y = it.y + bob;
+      ctx.globalAlpha = .2 + Math.sin(S.t * .09 + it.ph) * .07;
+      ctx.fillStyle = def.c;
+      ctx.beginPath(); ctx.arc(x, y, 23, 0, 6.2832); ctx.fill();
+      ctx.globalAlpha = 1;
+      ctx.save();
+      ctx.translate(x, y);
+      ctx.rotate(Math.PI / 4);
+      ctx.fillStyle = def.c;
+      rr(ctx, -9.5, -9.5, 19, 19, 5); ctx.fill();
+      ctx.restore();
+      // 三种道具用不同的内芯，一眼能分
+      ctx.fillStyle = 'rgba(10,16,28,.88)';
+      var k = def.c;
+      if (it.t === 'shield') {
+        ctx.beginPath();
+        ctx.moveTo(x, y - 7); ctx.lineTo(x + 6, y - 3.5);
+        ctx.lineTo(x + 6, y + 1.5); ctx.lineTo(x, y + 7);
+        ctx.lineTo(x - 6, y + 1.5); ctx.lineTo(x - 6, y - 3.5);
+        ctx.closePath(); ctx.fill();
+      } else if (it.t === 'pulse') {
+        ctx.beginPath(); ctx.arc(x, y, 3.4, 0, 6.2832); ctx.fill();
+        ctx.strokeStyle = 'rgba(10,16,28,.88)'; ctx.lineWidth = 2.2;
+        ctx.beginPath(); ctx.arc(x, y, 7, 0, 6.2832); ctx.stroke();
+      } else {
+        ctx.fillRect(x - 7, y - 4.5, 14, 2.2);
+        ctx.fillRect(x - 4.5, y - 0.6, 9, 2.2);
+        ctx.fillRect(x - 2, y + 3.3, 4, 2.2);
+      }
+    }
+  }
+
+  function drawHeldEnemy(e) {
+    var x = e.x, y = e.y, w = e.w, h = e.h;
+    var hpF = clamp(e.hp / e.maxhp, 0, 1);
+    // 石头不需要投影模糊 —— 一块偏移的暗色就够，还快得多
+    ctx.globalAlpha = .45;
+    ctx.fillStyle = '#05080f';
+    rr(ctx, x + 2, y + 5, w, h, 5); ctx.fill();
+    ctx.globalAlpha = 1;
+    rr(ctx, x, y, w, h, 5);
+    var g = ctx.createLinearGradient(x, y, x, y + h);
+    g.addColorStop(0, e.flash > 0 ? '#ffffff' : '#4a5474');
+    g.addColorStop(1, PAL.stoneDark);
+    ctx.fillStyle = g; ctx.fill();
+
+    // 内部裂纹随血量增加
+    var cracks = Math.floor((1 - hpF) * 4);
+    if (cracks > 0) {
+      ctx.strokeStyle = 'rgba(8,12,22,.9)'; ctx.lineWidth = 1.7;
+      ctx.beginPath();
+      for (var i = 0; i < cracks; i++) {
+        var s = (i + 1) / (cracks + 1);
+        ctx.moveTo(x + w * s, y + 2);
+        ctx.lineTo(x + w * (s + .14) - 3, y + h * .5);
+        ctx.lineTo(x + w * s + 2, y + h - 2);
+      }
+      ctx.stroke();
+    }
+    ctx.strokeStyle = 'rgba(150,175,225,.5)'; ctx.lineWidth = 1.4;
+    rr(ctx, x + .5, y + .5, w - 1, h - 1, 5); ctx.stroke();
+
+    // 静止纹：几道水平的扫描线，暗示「时间在这里不动」
+    ctx.save();
+    rr(ctx, x, y, w, h, 5); ctx.clip();
+    ctx.globalAlpha = .28;
+    ctx.strokeStyle = PAL.cy; ctx.lineWidth = 1;
+    ctx.beginPath();
+    for (var k = 0; k < 3; k++) {
+      var yy = y + ((S.t * .35 + k * h / 3) % h);
+      ctx.moveTo(x, yy); ctx.lineTo(x + w, yy);
+    }
+    ctx.stroke();
+    ctx.restore();
+    ctx.globalAlpha = 1;
+
+    // 头顶：正在被烧掉的血条
+    if (e.hp < e.maxhp) {
+      var bw = w + 6;
+      ctx.fillStyle = 'rgba(0,0,0,.6)';
+      ctx.fillRect(x + w / 2 - bw / 2, y - 9, bw, 4);
+      ctx.fillStyle = PAL.cy;
+      ctx.fillRect(x + w / 2 - bw / 2, y - 9, bw * hpF, 4);
+    }
+  }
+
+  function drawLive(e) {
+    var T = e.T, hue = Eggs.rainbow ? ((S.t * 4 + e.wave * 60) % 360) : T.hue;
+    var x = e.x, y = e.y + Math.sin(e.bob) * 2, w = e.w, h = e.h;
+    var flash = e.flash > 0;
+    // 外发光用"放大的半透明底"代替 shadowBlur —— 一屏十个敌人时这是数量级的差别
+    glow(ctx, x - 5, y - 5, w + 10, h + 10, 9, hsl(hue, 95, 60), flash ? .5 : .26);
+    rr(ctx, x, y, w, h, 6);
+    var g = ctx.createLinearGradient(x, y, x, y + h);
+    g.addColorStop(0, flash ? '#ffffff' : hsl(hue, 85, 68));
+    g.addColorStop(1, flash ? '#ffd9e0' : hsl((hue + 20) % 360, 82, 42));
+    ctx.fillStyle = g; ctx.fill();
+    rr(ctx, x + .7, y + .7, w - 1.4, h - 1.4, 6);
+    ctx.strokeStyle = 'rgba(255,255,255,.55)'; ctx.lineWidth = 1.3; ctx.stroke();
+
+    // 蓄力预警
+    if (e.chargeState === 1) {
+      var p = 1 - clamp(e.chargeT / 34, 0, 1);
+      ctx.globalAlpha = .35 + Math.sin(S.t * .8) * .3;
+      ctx.strokeStyle = PAL.red; ctx.lineWidth = 3;
+      rr(ctx, x - 4, y - 4, w + 8, h + 8, 8); ctx.stroke();
+      ctx.globalAlpha = 1;
+      ctx.strokeStyle = 'rgba(255,90,110,.8)'; ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.moveTo(x + w / 2, y + h / 2);
+      ctx.lineTo(x + w / 2 + e.face * (30 + p * 120), y + h / 2);
+      ctx.stroke();
+    }
+
+    // 眼睛 / 特征
+    var cx = x + w / 2, cy = y + h / 2;
+    ctx.fillStyle = '#0a0f1c';
+    if (T.noFreeze) {
+      ctx.strokeStyle = '#ffe3e6'; ctx.lineWidth = 2.2;
+      ctx.beginPath();
+      for (var k = 0; k < 4; k++) {
+        var a = S.t * .05 + k * 1.5708;
+        ctx.moveTo(cx, cy);
+        ctx.lineTo(cx + Math.cos(a) * w * .42, cy + Math.sin(a) * h * .42);
+      }
+      ctx.stroke();
+      ctx.beginPath(); ctx.arc(cx, cy, 3.4, 0, 6.2832); ctx.fillStyle = '#ffe3e6'; ctx.fill();
+    } else if (e.type === 'shooter') {
+      ctx.beginPath(); ctx.arc(cx - 5, cy - 2, 2.6, 0, 6.2832); ctx.fill();
+      ctx.beginPath(); ctx.arc(cx + 5, cy - 2, 2.6, 0, 6.2832); ctx.fill();
+      ctx.fillRect(cx - 3, cy + 5, 6, 2);
+    } else {
+      var ex = cx + e.face * 3;
+      ctx.beginPath(); ctx.arc(ex - 4, cy - 1, 2.8, 0, 6.2832); ctx.fill();
+      ctx.beginPath(); ctx.arc(ex + 4, cy - 1, 2.8, 0, 6.2832); ctx.fill();
+    }
+    // 血条
+    if (!T.noFreeze && e.hp < e.maxhp) {
+      var bw = w + 6;
+      ctx.fillStyle = 'rgba(0,0,0,.5)';
+      ctx.fillRect(cx - bw / 2, y - 8, bw, 4);
+      ctx.fillStyle = hsl(hue, 90, 62);
+      ctx.fillRect(cx - bw / 2, y - 8, bw * clamp(e.hp / e.maxhp, 0, 1), 4);
+    }
+  }
+
+  function drawPlayer() {
+    var ch = S.ch;
+    if (!ch || S.mode === 'over') return;
+    // 无敌帧只闪透明度，不能整帧不画 —— 那样玩家会有一半时间看不见自己。
+    // 世界定格之后就别闪了：那时候的无敌是"赢了"，不是"刚挨打"。
+    var blink = (S.invuln > 0 && !S.worldFrozen && Math.floor(S.t / 4) % 2 === 0);
+    var sq = ch.sq, sqx = ch.sqx;
+    var w = PW * sqx, h = PH * sq;
+    var x = ch.x + (PW - w) / 2, y = ch.y + (PH - h);
+    ctx.save();
+    ctx.globalAlpha = blink ? .38 : 1;
+    ctx.save();
+    ctx.globalAlpha = .3; ctx.fillStyle = '#000';
+    ctx.beginPath(); ctx.ellipse(ch.x + PW / 2, ch.y + PH + 3, PW * .6, 3.4, 0, 0, 6.2832); ctx.fill();
+    ctx.restore();
+
+    glow(ctx, x - 7, y - 7, w + 14, h + 14, 11, PAL.cy, .34);
+    // 护盾：角色外面套一圈会呼吸的光环
+    if (S.shield > 0) {
+      ctx.strokeStyle = 'rgba(107,227,255,.95)';
+      ctx.lineWidth = 2.4;
+      ctx.globalAlpha = .5 + Math.sin(S.t * .13) * .32;
+      rr(ctx, x - 9, y - 9, w + 18, h + 18, 13); ctx.stroke();
+      ctx.globalAlpha = 1;
+    }
+    rr(ctx, x, y, w, h, 6);
+    var g = ctx.createLinearGradient(x, y, x, y + h);
+    g.addColorStop(0, '#d8feff'); g.addColorStop(1, PAL.cy);
+    ctx.fillStyle = g; ctx.fill();
+    rr(ctx, x + .8, y + .8, w - 1.6, h - 1.6, 5.4);
+    ctx.strokeStyle = 'rgba(255,255,255,.85)'; ctx.lineWidth = 1.4; ctx.stroke();
+    var ex = x + w / 2 + ch.face * 1.8, ey = y + h * .35;
+    ctx.fillStyle = '#06121c';
+    if (ch.blink > 0) { ctx.fillRect(ex - 4.5, ey, 3, 1.8); ctx.fillRect(ex + 1.5, ey, 3, 1.8); }
+    else {
+      ctx.beginPath(); ctx.arc(ex - 3, ey, 2, 0, 6.2832); ctx.fill();
+      ctx.beginPath(); ctx.arc(ex + 3.2, ey, 2, 0, 6.2832); ctx.fill();
+    }
+    ctx.restore();
+  }
+
+  function drawCat() {
+    if (!Eggs.cat) return;
+    var c = Eggs.cat, y = FLOOR - 18;
+    ctx.save();
+    ctx.translate(c.x, y);
+    var bob = Math.sin(c.t * .25) * 1.5;
+    ctx.fillStyle = '#1d2540';
+    rr(ctx, -16, -9 + bob, 30, 11, 5); ctx.fill();
+    rr(ctx, 12, -17 + bob, 14, 14, 5); ctx.fill();
+    ctx.beginPath();
+    ctx.moveTo(14, -16 + bob); ctx.lineTo(17, -23 + bob); ctx.lineTo(20, -16 + bob);
+    ctx.moveTo(21, -16 + bob); ctx.lineTo(24, -23 + bob); ctx.lineTo(26, -16 + bob);
+    ctx.fill();
+    ctx.strokeStyle = '#1d2540'; ctx.lineWidth = 2.6; ctx.lineCap = 'round';
+    ctx.beginPath();
+    ctx.moveTo(-16, -4 + bob);
+    ctx.quadraticCurveTo(-26, -6 + bob + Math.sin(c.t * .12) * 4, -24, -17 + bob + Math.sin(c.t * .12) * 3);
+    ctx.stroke();
+    ctx.fillStyle = PAL.gold;
+    ctx.beginPath(); ctx.arc(17, -10 + bob, 1.6, 0, 6.2832); ctx.fill();
+    ctx.beginPath(); ctx.arc(23, -10 + bob, 1.6, 0, 6.2832); ctx.fill();
+    ctx.restore();
+  }
+
+  function drawBullets() {
+    for (var i = 0; i < S.bullets.length; i++) {
+      var b = S.bullets[i];
+      if (b.live) {
+        ctx.globalAlpha = .28;
+        ctx.fillStyle = PAL.pink;
+        ctx.beginPath(); ctx.arc(b.x, b.y, b.r + 5, 0, 6.2832); ctx.fill();
+        ctx.globalAlpha = 1;
+      }
+      ctx.fillStyle = b.live ? '#ffe0ea' : 'rgba(150,165,205,.62)';
+      ctx.beginPath(); ctx.arc(b.x, b.y, b.r, 0, 6.2832); ctx.fill();
+      if (!b.live) { ctx.strokeStyle = 'rgba(150,175,225,.5)'; ctx.lineWidth = 1; ctx.beginPath(); ctx.arc(b.x, b.y, b.r + 3, 0, 6.2832); ctx.stroke(); }
+    }
+  }
+
+  function drawParts() {
+    for (var i = 0; i < S.parts.length; i++) {
+      var p = S.parts[i];
+      ctx.globalAlpha = clamp(p.life / p.max, 0, 1);
+      ctx.fillStyle = p.c;
+      ctx.fillRect(p.x - p.s / 2, p.y - p.s / 2, p.s, p.s);
+    }
+    ctx.globalAlpha = 1;
+  }
+
+  function drawField() {
+    var f = S.field;
+    // 圈外压暗
+    ctx.beginPath();
+    ctx.rect(0, 0, W, H);
+    ctx.arc(f.x, f.y, f.r, 0, 6.2832, true);
+    ctx.fillStyle = 'rgba(4,8,18,.52)';
+    ctx.fill();
+    // 场内微光
+    var rg = ctx.createRadialGradient(f.x, f.y, 0, f.x, f.y, f.r);
+    rg.addColorStop(0, 'rgba(79,227,255,.10)');
+    rg.addColorStop(.72, 'rgba(79,227,255,.045)');
+    rg.addColorStop(1, 'rgba(79,227,255,0)');
+    ctx.fillStyle = rg;
+    ctx.beginPath(); ctx.arc(f.x, f.y, f.r, 0, 6.2832); ctx.fill();
+    // 环：外发光用两层描边，不用阴影模糊
+    ctx.strokeStyle = 'rgba(79,227,255,.17)'; ctx.lineWidth = 10;
+    ctx.beginPath(); ctx.arc(f.x, f.y, f.r, 0, 6.2832); ctx.stroke();
+    var ringing = S.breathe > 0;
+    var wid = WEP().id;
+    ctx.strokeStyle = ringing ? 'rgba(255,209,102,.95)'
+                    : (wid === 'scope' ? 'rgba(255,150,150,.92)' : 'rgba(140,240,255,.92)');
+    ctx.lineWidth = 2.2;
+    // 「撒手」画成虚线 —— 它什么也攥不住，实线圈会骗人
+    if (wid === 'letgo') { try { ctx.setLineDash([9, 11]); } catch (e) {} }
+    ctx.beginPath(); ctx.arc(f.x, f.y, f.r, 0, 6.2832); ctx.stroke();
+    if (wid === 'letgo') { try { ctx.setLineDash([]); } catch (e) {} }
+
+    // 狙击镜：十字准星。它是个用来「瞄」的东西，没有准星说不过去。
+    if (wid === 'scope') {
+      var gap = Math.max(5, f.r * .13);
+      var arm = f.r * .95;
+      ctx.strokeStyle = 'rgba(255,150,150,.9)';
+      ctx.lineWidth = 1.6;
+      ctx.beginPath();
+      ctx.moveTo(f.x - arm, f.y); ctx.lineTo(f.x - gap, f.y);
+      ctx.moveTo(f.x + gap, f.y); ctx.lineTo(f.x + arm, f.y);
+      ctx.moveTo(f.x, f.y - arm); ctx.lineTo(f.x, f.y - gap);
+      ctx.moveTo(f.x, f.y + gap); ctx.lineTo(f.x, f.y + arm);
+      ctx.stroke();
+      ctx.fillStyle = 'rgba(255,120,120,.95)';
+      ctx.beginPath(); ctx.arc(f.x, f.y, 2, 0, 6.2832); ctx.fill();
+      // 环上的刻度：每 30° 一根，整点那几根长一些
+      for (var tk = 0; tk < 12; tk++) {
+        var ta = tk * Math.PI / 6;
+        var r1 = f.r - (tk % 3 === 0 ? 12 : 6), r2 = f.r - 1;
+        ctx.strokeStyle = 'rgba(255,160,160,.5)'; ctx.lineWidth = 1.3;
+        ctx.beginPath();
+        ctx.moveTo(f.x + Math.cos(ta) * r1, f.y + Math.sin(ta) * r1);
+        ctx.lineTo(f.x + Math.cos(ta) * r2, f.y + Math.sin(ta) * r2);
+        ctx.stroke();
+      }
+    }
+    if (ringing) {
+      // 剩余时间画成一段弧
+      ctx.strokeStyle = 'rgba(255,255,255,.85)';
+      ctx.lineWidth = 4;
+      ctx.beginPath();
+      ctx.arc(f.x, f.y, f.r + 6, -1.5708, -1.5708 + 6.2832 * (S.breathe / BREATHE_TIME));
+      ctx.stroke();
+    }
+    // 圈心画个小准星 —— 不然玩家不觉得这个圈跟自己手上的鼠标有关系。
+    // 「不知道怎么杀」有一半是不知道圈跟着鼠标跑。
+    ctx.strokeStyle = 'rgba(205,240,255,.8)';
+    ctx.lineWidth = 1.4;
+    ctx.beginPath(); ctx.arc(f.x, f.y, 6.5, 0, 6.2832); ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(f.x - 13, f.y); ctx.lineTo(f.x - 9.5, f.y);
+    ctx.moveTo(f.x + 9.5, f.y); ctx.lineTo(f.x + 13, f.y);
+    ctx.moveTo(f.x, f.y - 13); ctx.lineTo(f.x, f.y - 9.5);
+    ctx.moveTo(f.x, f.y + 9.5); ctx.lineTo(f.x, f.y + 13);
+    ctx.stroke();
+
+    // 流动刻度
+    ctx.strokeStyle = 'rgba(79,227,255,.45)'; ctx.lineWidth = 2;
+    ctx.beginPath();
+    for (var i = 0; i < 12; i++) {
+      var a = f.pl + i * .5236;
+      var r1 = f.r - 8, r2 = f.r - 3;
+      ctx.moveTo(f.x + Math.cos(a) * r1, f.y + Math.sin(a) * r1);
+      ctx.lineTo(f.x + Math.cos(a) * r2, f.y + Math.sin(a) * r2);
+    }
+    ctx.stroke();
+    // 脉冲波
+    if (S.pulse.fx > 0) {
+      ctx.globalAlpha = S.pulse.fx * .85;
+      ctx.strokeStyle = PAL.cy; ctx.lineWidth = 5 * S.pulse.fx + 1;
+      ctx.beginPath(); ctx.arc(f.x, f.y, f.r * (1.25 - S.pulse.fx * .45), 0, 6.2832); ctx.stroke();
+      ctx.globalAlpha = 1;
+    }
+    // 圈里钉住了几个
+    var n = f.hold;
+    if (n > 0) {
+      ctx.globalAlpha = .4 + Math.sin(S.t * .25) * .18;
+      ctx.strokeStyle = PAL.cy; ctx.lineWidth = 3;
+      ctx.setLineDash([13, 9]);
+      ctx.beginPath(); ctx.arc(f.x, f.y, f.r + 7, 0, 6.2832); ctx.stroke();
+      ctx.setLineDash([]);
+      ctx.globalAlpha = 1;
+    }
+  }
+
+  // ══════════════════════════════════════════════════════════════
+  // 主题
+  // 用 canvas 元素上的 CSS filter 切换整套配色 —— GPU 合成，几乎零成本。
+  // 这样就不用去动那 87 处 rgba 和 33 处硬编码十六进制色。
+  // ══════════════════════════════════════════════════════════════
+  // 只留「夜」。雪那套是靠 canvas 的 CSS filter 反色做的 ——
+  // 白底上一堆冷色元素糊成一片，实际玩的人看不清屏幕。玩的人比本喵有发言权，删掉。
+  var THEMES = [
+    { n: '夜', f: 'none' }
+  ];
+  function applyTheme(i, quiet) {
+    var n = THEMES.length;
+    S.theme = (((i | 0) % n) + n) % n;
+    try { if (canvas && canvas.style) canvas.style.filter = THEMES[S.theme].f; } catch (e) {}
+    try { var sv = Save.get(); sv.theme = S.theme; Save.flush(); } catch (e) {}
+    if (!quiet) {
+      S.floats.push({ s: '主题 · ' + THEMES[S.theme].n, x: W / 2, y: 128, t: 90, c: PAL.gold });
+      Sound.ui();
+    }
+  }
+
+  function heartPath(x, y, s, fill) {
+    ctx.fillStyle = fill;
+    ctx.beginPath();
+    ctx.moveTo(x, y + s * .35);
+    ctx.bezierCurveTo(x, y - s * .35, x - s, y + s * .1, x, y + s);
+    ctx.bezierCurveTo(x + s, y + s * .1, x, y - s * .35, x, y + s * .35);
+    ctx.fill();
+  }
+
+  function drawHUD() {
+    // 血
+    var mh = S.maxHp || MAX_HP;
+    for (var i = 0; i < mh; i++) {
+      var x = 22 + i * 30, y = 24;
+      var on = i < S.hp;
+      // 画一大一小两颗心当发光，比 shadowBlur 便宜得多
+      if (on) heartPath(x, y, 15, 'rgba(255,93,132,.26)');
+      heartPath(x, y, 11, on ? PAL.pink : 'rgba(120,140,180,.22)');
+      if (i === mh - 1 && S.shield > 0) {
+        // 血量右边：护盾还剩几层
+        txt(ctx, '护盾 ×' + S.shield, x + 22, y + 5, { s: 13, c: PAL.cy, w: '800' });
+      }
+    }
+    var C = CHAPTER();
+    if (S.breathe > 0) {
+      txt(ctx, '喘 息 · 攥住不算数  ' + (S.breathe / 60).toFixed(1) + 's',
+        W / 2, 66, { a: 'center', s: 13, c: PAL.gold, w: '800', glow: 'rgba(255,209,102,.8)', blur: 12 });
+    }
+    if (isFinale()) {
+      var d9 = S.door, op = d9 && d9.open;
+      txt(ctx, '第 ' + (S.chapter + 1) + ' 章 · 放手', W / 2, 24,
+        { a: 'center', s: 17, c: op ? PAL.gold : PAL.cy, glow: op ? 'rgba(255,209,102,.8)' : 'rgba(79,227,255,.7)', blur: 14 });
+      var hint = !d9 ? '' :
+        op ? '门开了 —— 走进去' :
+        !d9.near ? '走到右边那扇门' :
+        (S.field.hold === 0 ? '松着，别动' : '把圈甩到没人的角落 —— 你手里还攥着东西');
+      txt(ctx, hint, W / 2, 45,
+        { a: 'center', s: 11.5, c: op ? PAL.gold : (d9 && d9.near && S.field.hold > 0 ? PAL.red : PAL.dim), w: '700' });
+    } else {
+      // 无限不是「第 14 章」，它是另一回事，别给它安个章号
+      txt(ctx, (C.infinite || C.workshop || C.__custom ? C.n : '第 ' + (S.chapter + 1) + ' 章 · ' + C.n), W / 2, 24, { a: 'center', s: 17, c: PAL.cy, glow: 'rgba(79,227,255,.7)', blur: 14 });
+      txt(ctx, goalLabel(), W / 2, 45,
+        { a: 'center', s: 11.5, c: goalMet() ? PAL.mint : PAL.dim, w: '700' });
+    }
+    txt(ctx, '击杀 ' + S.runKills, W - 22, 24, { a: 'right', s: 15, c: PAL.gold, glow: 'rgba(255,209,102,.6)', blur: 12 });
+    // 武器槽位：写成「2 狙击镜」这样，玩家才知道按几能换
+    var slotX = W - 22;
+    for (var ws = WEAPONS.length - 1; ws >= 0; ws--) {
+      if (!owns(ws)) continue;
+      var onSlot = S.weapon === ws;
+      var slotTxt = (ws + 1) + ' ' + WEAPONS[ws].n;
+      txt(ctx, slotTxt, slotX, 45,
+        { a: 'right', s: 11.5, c: onSlot ? PAL.gold : 'rgba(140,165,210,.55)', w: onSlot ? '800' : '600' });
+      var wpx = 0;
+      for (var sc = 0; sc < slotTxt.length; sc++) wpx += slotTxt.charCodeAt(sc) > 255 ? 11.5 : 6.2;
+      slotX -= wpx + 14;
+    }
+    // 第 13 章：顶上一条巨物的血条
+    if (S.boss && !S.boss.dead && S.mode === 'play') {
+      var bw2 = 520, bx2 = W / 2 - bw2 / 2, by2 = 66;
+      var bf = clamp(S.boss.hp / S.boss.maxhp, 0, 1);
+      ctx.fillStyle = 'rgba(6,8,16,.85)';
+      rr(ctx, bx2 - 3, by2 - 3, bw2 + 6, 16, 8); ctx.fill();
+      ctx.fillStyle = S.boss.phase === 3 ? PAL.red : (S.boss.phase === 2 ? PAL.gold : 'rgba(255,120,150,.9)');
+      rr(ctx, bx2, by2, bw2 * bf, 10, 5); ctx.fill();
+      txt(ctx, (S.boss.up ? '眼睛在外面 —— 打它' : '它闭着眼…'), W / 2, by2 + 30,
+        { a: 'center', s: 12.5, c: S.boss.up ? PAL.gold : 'rgba(150,175,215,.8)', w: '800' });
+    }
+    // 攥不住的武器打不动眼睛 —— 和不化那条一个道理
+    if (S.boss && !S.boss.dead && S.boss.up && !WEP().canHold && WEP().id !== 'scope') {
+      txt(ctx, '这把武器攥不住那只眼睛 —— 按 1 或 2 换', W / 2, 490,
+        { a: 'center', s: 13, c: PAL.red, w: '800', glow: 'rgba(255,80,110,.6)', blur: 10 });
+    }
+
+    if (S.showFps && S._ft && S._ft.length > 4) {
+      var mx = 0, sum = 0;
+      for (var fi = 0; fi < S._ft.length; fi++) { sum += S._ft[fi]; if (S._ft[fi] > mx) mx = S._ft[fi]; }
+      var avg = sum / S._ft.length;
+      txt(ctx, '平均 ' + avg.toFixed(1) + 'ms　峰值 ' + mx.toFixed(1) + 'ms　( ' + S._ft.length + ' )',
+        W - 14, 66, { a: 'right', s: 12.5, c: mx > 34 ? PAL.red : PAL.mint, w: '800' });
+    }
+
+    // 第一次玩：把「怎么杀」直接摆在屏幕中间
+    var tl = tutLine();
+    if (tl && S.mode === 'play' && !S.boss) {   // 和 boss 血条抢位置，让位
+      var tw = 0;
+      for (var ti = 0; ti < tl.length; ti++) tw += tl.charCodeAt(ti) > 255 ? 15.5 : 8;
+      ctx.fillStyle = 'rgba(6,10,20,.78)';
+      // 放顶部，别压住角色 —— 第一次玩的人最需要看清自己
+      rr(ctx, W / 2 - tw / 2 - 20, 62, tw + 40, 34, 10); ctx.fill();
+      txt(ctx, tl, W / 2, 84, { a: 'center', s: 15, c: PAL.gold, w: '800' });
+    }
+
+    // 手里这把砸不动「不化」，场上有它 —— 不提醒的话玩家会以为游戏坏了
+    // （尤其第 7 章「独」全是「不化」，带着「撒手」进去是打不通的）
+    if (!WEP().spikeKill) {
+      for (var hs = 0; hs < S.enemies.length; hs++) {
+        if (!S.enemies[hs].dead && S.enemies[hs].T.noFreeze) {
+          txt(ctx, '「不化」砸不动 —— 按 1 或 2 换把武器', W / 2, 490,
+            { a: 'center', s: 13, c: PAL.red, w: '800', glow: 'rgba(255,80,110,.6)', blur: 10 });
+          break;
+        }
+      }
+    }
+
+    // 底部只留一条脉冲 CD；放在地板下方，不会压到角色
+    // （时间场的大小由圈本身表达，不需要再画一条）
+    var qw = 168, qx = W / 2 - qw / 2, qy = H - 15;
+    var f = 1 - S.pulse.cd / WEP().cd;   // 每把武器 CD 不同，进度条得跟着走
+    txt(ctx, '脉冲', qx - 8, qy, { a: 'right', s: 10, c: f >= 1 ? PAL.cy : PAL.faint, w: '700' });
+    ctx.fillStyle = 'rgba(10,16,30,.8)';
+    rr(ctx, qx, qy - 5, qw, 10, 5); ctx.fill();
+    if (f > 0) {
+      ctx.fillStyle = f >= 1 ? PAL.cy : 'rgba(79,227,255,.42)';
+      rr(ctx, qx + 2, qy - 3, (qw - 4) * f, 6, 3); ctx.fill();
+    }
+    if (f >= 1 && S.t % 60 < 40) {
+      txt(ctx, '右键', qx + qw + 8, qy, { a: 'left', s: 10, c: PAL.cy, w: '700' });
+    }
+
+    // 攥住数量：贴着圈画，视线不用离开战场
+    if (S.field.hold > 0) {
+      var t01 = clamp((S.field.r / R_BASE - R_FLOOR) / (1 - R_FLOOR), 0, 1);
+      txt(ctx, '攥住 ×' + S.field.hold, S.field.x, S.field.y + S.field.r + 20,
+        { a: 'center', s: 12, c: t01 > .5 ? PAL.cy : PAL.orange, w: '700', glow: 'rgba(0,0,0,.9)', blur: 8 });
+    }
+  }
+
+  function drawBanner() {
+    if (S.bannerT <= 0 || !S.banner) return;
+    var a = S.bannerT > 80 ? (110 - S.bannerT) / 30 : (S.bannerT < 30 ? S.bannerT / 30 : 1);
+    var sc = 1 + (1 - clamp(a, 0, 1)) * .3;
+    ctx.save();
+    ctx.globalAlpha = clamp(a, 0, 1);
+    ctx.translate(W / 2, 150);
+    ctx.scale(sc, sc);
+    txt(ctx, S.banner.s, 0, 0, { a: 'center', s: 40, c: S.banner.c, w: '800', glow: 'rgba(0,0,0,.8)', blur: 20 });
+    ctx.restore();
+  }
+
+  function drawFloats() {
+    for (var i = 0; i < S.floats.length; i++) {
+      var f = S.floats[i];
+      ctx.globalAlpha = clamp(f.t / 40, 0, 1);
+      txt(ctx, f.s, f.x, f.y, { a: 'center', s: 14, c: f.c, glow: 'rgba(0,0,0,.8)', blur: 8 });
+    }
+    ctx.globalAlpha = 1;
+  }
+
+  function drawToasts() {
+    for (var i = 0; i < achQ.length; i++) {
+      var a = achQ[i];
+      var ain = clamp(a.t / 12, 0, 1), aout = clamp((200 - a.t) / 20, 0, 1);
+      var al = Math.min(ain, aout);
+      var y = 62 + i * 52, x = W - 260;      // 放右上：右下角是终章那扇门的位置
+      ctx.globalAlpha = al;
+      ctx.save();
+      ctx.shadowColor = 'rgba(0,0,0,.6)'; ctx.shadowBlur = 18;
+      ctx.fillStyle = 'rgba(14,20,36,.97)';
+      rr(ctx, x, y, 244, 44, 9); ctx.fill();
+      ctx.restore();
+      ctx.strokeStyle = 'rgba(255,209,102,.55)'; ctx.lineWidth = 1;
+      rr(ctx, x + .5, y + .5, 243, 43, 9); ctx.stroke();
+      ctx.fillStyle = PAL.gold;
+      ctx.beginPath();
+      for (var s = 0; s < 10; s++) {
+        var ang = -1.5708 + s * .6283, rad = s % 2 ? 3.4 : 7.5;
+        ctx[s ? 'lineTo' : 'moveTo'](x + 25 + Math.cos(ang) * rad, y + 22 + Math.sin(ang) * rad);
+      }
+      ctx.closePath(); ctx.fill();
+      txt(ctx, '成就', x + 42, y + 14, { s: 9.5, c: 'rgba(255,209,102,.85)' });
+      txt(ctx, a.n, x + 42, y + 28, { s: 13, c: PAL.ink });
+      txt(ctx, a.d, x + 130, y + 28, { s: 9.5, c: 'rgba(150,170,210,.75)', w: '500' });
+      ctx.globalAlpha = 1;
+    }
+  }
+
+  function drawGlitch() {
+    if (Eggs.glitch <= 0) return;
+    for (var i = 0; i < 10; i++) {
+      ctx.globalAlpha = .1 + Math.random() * .16;
+      ctx.fillStyle = Math.random() < .5 ? PAL.mint : PAL.pink;
+      ctx.fillRect(0, Math.random() * H, W, 2 + Math.random() * 14);
+    }
+    ctx.globalAlpha = 1;
+  }
+
+  // ── 终章的门：只在 hold===0 时打开 ──
+  function drawDoor() {
+    var d = S.door; if (!d) return;
+    var o = d.glow, x = d.x, y = d.y, w = d.w, h = d.h;
+    ctx.save();
+    ctx.shadowColor = 'rgba(255,209,102,' + (.35 + o * .6) + ')';
+    ctx.shadowBlur = 8 + o * 34;
+    // 门框随充能变暖；但"开没开"只看 d.open —— 否则充一半就亮得像开了
+    ctx.fillStyle = hsl(44, 35 + o * 55, 18 + o * 42);
+    rr(ctx, x, y, w, h, 9); ctx.fill();
+    ctx.restore();
+    ctx.fillStyle = d.open ? 'rgba(255,242,205,.96)' : 'rgba(8,12,24,.94)';
+    rr(ctx, x + 9, y + 12, w - 18, h - 20, 5); ctx.fill();
+    if (d.open) {
+      ctx.save();
+      rr(ctx, x + 9, y + 12, w - 18, h - 20, 5); ctx.clip();
+      ctx.globalAlpha = .35 + Math.sin(S.t * .12) * .18;
+      ctx.strokeStyle = '#fff';
+      ctx.lineWidth = 3;
+      ctx.beginPath();
+      for (var i = 0; i < 5; i++) {
+        var yy = y + 14 + ((S.t * .8 + i * 24) % (h - 24));
+        ctx.moveTo(x + 12, yy); ctx.lineTo(x + w - 12, yy);
+      }
+      ctx.stroke();
+      ctx.restore();
+      ctx.globalAlpha = 1;
+    }
+    if (d.open) {
+      txt(ctx, '开 着', x + w / 2, y - 20,
+        { a: 'center', s: 14, c: PAL.gold, w: '700', glow: 'rgba(255,209,102,.9)', blur: 14 });
+      txt(ctx, '进去', x + w / 2, y - 40, { a: 'center', s: 11, c: 'rgba(255,235,180,.9)', w: '600' });
+    } else {
+      // 门闩进度环：站在门口、空着手，才会往上走
+      var cg = clamp(d.charge || 0, 0, 1);
+      var cx2 = x + w / 2, cy2 = y - 30;
+      ctx.save();
+      ctx.lineCap = 'round';
+      ctx.strokeStyle = 'rgba(120,150,200,.26)'; ctx.lineWidth = 5;
+      ctx.beginPath(); ctx.arc(cx2, cy2, 17, 0, 6.2832); ctx.stroke();
+      if (cg > 0) {
+        ctx.strokeStyle = PAL.gold;
+        ctx.shadowColor = 'rgba(255,209,102,.8)'; ctx.shadowBlur = 12;
+        ctx.beginPath(); ctx.arc(cx2, cy2, 17, -1.5708, -1.5708 + 6.2832 * cg); ctx.stroke();
+      }
+      ctx.restore();
+      var ok2 = d.near && S.field.hold === 0;
+      txt(ctx, !d.near ? '走到门口' : (ok2 ? '别动，松着' : '手上有东西！'),
+        cx2, cy2 - 32,
+        { a: 'center', s: 11.5, c: ok2 ? PAL.gold : (d.near ? PAL.red : 'rgba(140,160,200,.65)'), w: '700' });
+    }
+  }
+
+  // ── 选章 ──
+  function drawSelect() {
+    ctx.fillStyle = 'rgba(4,7,14,.93)';
+    ctx.fillRect(0, 0, W, H);
+    txt(ctx, '静 止', W / 2, 62, { a: 'center', s: 34, c: PAL.ink, w: '800', glow: 'rgba(79,227,255,.6)', blur: 11 });
+    txt(ctx, CN_CHAPTERS.split('').join(' ') + ' 章', W / 2, 96, { a: 'center', s: 13, c: PAL.cy, w: '700' });
+
+    var sv = Save.get();
+    for (var i = 0; i < CHAPTERS.length; i++) {
+      var cell = selectCell(i);
+      var x = cell.x, y = cell.y, cw = cell.w, chh = cell.h;
+      var sel = (i === S.selIdx);
+      var done = (i + 1) < (sv.unlocked || 1);
+      var C = CHAPTERS[i];
+      // 点不了的章：整块压黑、连名字都是暗的
+      if (!canPick(i)) {
+        ctx.fillStyle = 'rgba(6,8,14,.82)';
+        rr(ctx, x, y, cw, chh, 11); ctx.fill();
+        txt(ctx, (i + 1) + '　' + C.n, x + 16, y + 25, { s: 18, c: 'rgba(90,105,135,.5)', w: '700' });
+        continue;
+      }
+      // 上锁时变红的只有「真终章」那一张 —— 无限那张卡有自己的绿边，不该被涂红
+      if (lockedToLast() && !C.infinite) {
+        ctx.save();
+        ctx.shadowColor = 'rgba(255,60,90,.75)'; ctx.shadowBlur = 26;
+        ctx.fillStyle = 'rgba(255,60,90,.2)';
+        rr(ctx, x, y, cw, chh, 11); ctx.fill();
+        ctx.restore();
+        ctx.strokeStyle = PAL.red; ctx.lineWidth = 2.4;
+        rr(ctx, x + 1, y + 1, cw - 2, chh - 2, 11); ctx.stroke();
+        txt(ctx, (i + 1) + '　' + C.n, x + 16, y + 25, { s: 18, c: '#ffdde4', w: '800' });
+        txt(ctx, '真的结束了吗', x + 16, y + 49, { s: 11.5, c: 'rgba(255,150,170,.9)', w: '600' });
+        continue;
+      }
+      if (sel) {
+        ctx.save();
+        ctx.shadowColor = 'rgba(79,227,255,.55)'; ctx.shadowBlur = 18;
+        ctx.fillStyle = 'rgba(79,227,255,.16)';
+        rr(ctx, x, y, cw, chh, 11); ctx.fill();
+        ctx.restore();
+        ctx.strokeStyle = PAL.cy; ctx.lineWidth = 2;
+        rr(ctx, x + 1, y + 1, cw - 2, chh - 2, 11); ctx.stroke();
+      } else {
+        ctx.fillStyle = 'rgba(120,150,220,.055)';
+        rr(ctx, x, y, cw, chh, 11); ctx.fill();
+        ctx.strokeStyle = 'rgba(120,160,230,.16)'; ctx.lineWidth = 1;
+        rr(ctx, x + .5, y + .5, cw - 1, chh - 1, 11); ctx.stroke();
+      }
+      if (C.finale) {
+        ctx.fillStyle = sel ? PAL.gold : 'rgba(255,209,102,.55)';
+        ctx.fillRect(x, y + chh - 3, cw, 3);
+      }
+      if (C.infinite) {
+        ctx.fillStyle = sel ? PAL.mint : 'rgba(95,240,192,.5)';
+        ctx.fillRect(x, y + chh - 3, cw, 3);
+      }
+      txt(ctx, (i + 1) + '　' + C.n, x + 16, y + 25, { s: 18, c: sel ? PAL.ink : 'rgba(200,220,250,.85)', w: '700' });
+      txt(ctx, fitText(C.sel || String(C.sub).split('\n')[0], cw - 32, 11.5), x + 16, y + 49,
+        { s: 11.5, c: 'rgba(150,175,220,.72)', w: '500' });
+      if (C.finale) txt(ctx, '终章', x + cw - 16, y + 25, { a: 'right', s: 11, c: PAL.gold, w: '700' });
+      if (C.infinite) txt(ctx, '∞', x + cw - 18, y + 26, { a: 'right', s: 20, c: PAL.mint, w: '800' });
+      if (done) txt(ctx, '✓', x + cw - 16, y + 49, { a: 'right', s: 13, c: PAL.mint, w: '700' });
+    }
+    txt(ctx, '← → ↑ ↓ / 鼠标 选章　·　空格 / 回车 / 点击 进入　·　B 商店　·　Esc 回首页', W / 2, 518,
+      { a: 'center', s: 12.5, c: 'rgba(190,210,245,.85)', w: '600' });
+    txt(ctx, '本喵不锁门 —— ' + CN_CHAPTERS + '章从第一秒起就都开着。想先看结局也行。',
+      W / 2, 542, { a: 'center', s: 11, c: 'rgba(130,155,200,.7)', w: '500' });
+    // 左上角：回首页。老板报「回不到首页」—— 选章以前是个死胡同。
+    var hb = HOME_BTN;
+    var hhov = S.mouse.x >= hb[0] && S.mouse.x <= hb[0] + hb[2] && S.mouse.y >= hb[1] && S.mouse.y <= hb[1] + hb[3];
+    ctx.fillStyle = hhov ? 'rgba(120,150,220,.22)' : 'rgba(120,150,220,.09)';
+    rr(ctx, hb[0], hb[1], hb[2], hb[3], 10); ctx.fill();
+    ctx.strokeStyle = hhov ? 'rgba(150,185,240,.75)' : 'rgba(120,160,230,.28)'; ctx.lineWidth = 1.3;
+    rr(ctx, hb[0] + .7, hb[1] + .7, hb[2] - 1.4, hb[3] - 1.4, 10); ctx.stroke();
+    txt(ctx, '← 首页', hb[0] + hb[2] / 2, hb[1] + 25, { a: 'center', s: 13.5, c: 'rgba(195,215,250,.9)', w: '800' });
+
+    // 右上角：商店入口 + 金币
+    var bx = W - 168, by = 34, bw = 148, bh = 40;
+    var bhov = S.mouse.x >= bx && S.mouse.x <= bx + bw && S.mouse.y >= by && S.mouse.y <= by + bh;
+    ctx.fillStyle = bhov ? 'rgba(255,209,102,.22)' : 'rgba(255,209,102,.1)';
+    rr(ctx, bx, by, bw, bh, 10); ctx.fill();
+    ctx.strokeStyle = bhov ? 'rgba(255,209,102,.8)' : 'rgba(255,209,102,.35)'; ctx.lineWidth = 1.4;
+    rr(ctx, bx + .7, by + .7, bw - 1.4, bh - 1.4, 10); ctx.stroke();
+    txt(ctx, '商店 · B', bx + 14, by + 26, { s: 15, c: PAL.gold, w: '800' });
+    txt(ctx, (sv.coins || 0) + ' 金', bx + bw - 14, by + 26, { a: 'right', s: 14, c: PAL.gold, w: '700' });
+
+    txt(ctx, '成就 ' + achCount() + ' / ' + ACHS.length, W - 16, H - 14,
+      { a: 'right', s: 10.5, c: 'rgba(110,135,180,.6)', w: '500' });
+  }
+
+  // ── 章节卡 ──
+  function drawIntro() {
+    var a = clamp(S.introT / 25, 0, 1);
+    ctx.fillStyle = 'rgba(4,7,14,' + (.88 * a) + ')';
+    ctx.fillRect(0, 0, W, H);
+    var C = CHAPTER();
+    txt(ctx, chapNo(), W / 2, 158, { a: 'center', s: 14, c: PAL.cy, w: '700' });
+    txt(ctx, C.n, W / 2, 224, { a: 'center', s: 62, c: PAL.ink, w: '800', glow: 'rgba(79,227,255,.65)', blur: 13 });
+    var lines = String(C.sub).split('\n');
+    for (var i = 0; i < lines.length; i++) {
+      txt(ctx, lines[i], W / 2, 310 + i * 30, { a: 'center', s: 15, c: 'rgba(205,225,255,.88)', w: '500' });
+    }
+    if (C.finale) {
+      txt(ctx, '目标：走到右边的门。门只在你什么都没攥住的时候打开。',
+        W / 2, 310 + lines.length * 30 + 14, { a: 'center', s: 13, c: PAL.gold, w: '700' });
+    } else {
+      txt(ctx, goalBrief(),
+        W / 2, 310 + lines.length * 30 + 14, { a: 'center', s: 13, c: PAL.gold, w: '700' });
+    }
+    if (S.mercy > 0) {
+      txt(ctx, '你在这章已经失败 ' + S.fails + ' 次 —— 本章血上限 +' + S.mercy,
+        W / 2, 468, { a: 'center', s: 12.5, c: PAL.mint, w: '600' });
+    }
+    if (S.introT > 36 && S.t % 70 < 46) {
+      txt(ctx, '按 任 意 键 开 始', W / 2, 500, { a: 'center', s: 16, c: PAL.gold, glow: 'rgba(255,209,102,.7)', blur: 16 });
+    }
+    txt(ctx, S.testing ? 'Esc 回工坊' : 'Esc 回选章', W / 2, 546, { a: 'center', s: 11, c: PAL.dim, w: '500' });
+  }
+
+  // ── 章节通过 ──
+  function drawClear() {
+    var a = clamp(S.clearT / 22, 0, 1);
+    ctx.fillStyle = 'rgba(4,7,14,' + (.84 * a) + ')';
+    ctx.fillRect(0, 0, W, H);
+    var C = CHAPTER();
+    // 自制关不写「到底了」—— 那是给战役最后一张卡的
+    var last = !isCustomRun() && !C.infinite && S.chapter >= CHAPTERS.length - 1;
+    txt(ctx, last ? '到 底 了' : '通 过', W / 2, 196,
+      { a: 'center', s: 46, c: PAL.mint, w: '800', glow: 'rgba(67,245,176,.6)', blur: 12 });
+    txt(ctx, chapLabel(), W / 2, 262, { a: 'center', s: 21, c: PAL.ink, w: '700' });
+    ctx.fillStyle = 'rgba(120,150,200,.22)';
+    ctx.fillRect(W / 2 - 190, 296, 380, 1);
+    txt(ctx, '击杀 ' + S.runKills, W / 2 - 110, 330, { a: 'center', s: 14, c: PAL.cy, w: '700' });
+    txt(ctx, (S.runT / 60).toFixed(1) + ' 秒', W / 2, 330, { a: 'center', s: 14, c: PAL.cy, w: '700' });
+    txt(ctx, '剩 ' + S.hp + ' ♥', W / 2 + 110, 330, { a: 'center', s: 14, c: PAL.pink, w: '700' });
+    if (S.clearT > 34 && S.t % 70 < 46) {
+      txt(ctx, last ? '按 任 意 键 看 结 局' : '按 任 意 键 进 入 下 一 章',
+        W / 2, 430, { a: 'center', s: 16, c: PAL.gold, glow: 'rgba(255,209,102,.7)', blur: 16 });
+    }
+  }
+
+  // ── 暂停 ──
+  var PAUSE_W = 320, PAUSE_H = 42, PAUSE_GAP = 8, PAUSE_Y0 = 252;
+  function pauseItems() {
+    return [
+      { k: 'resume',  s: '继续' },
+      { k: 'restart', s: '重开本章' },
+      { k: 'select',  s: S.testing ? '回工坊' : '回选章' },
+      { k: 'sound',   s: '音效：' + (Sound.on() ? '开' : '关') }
+    ];
+  }
+  function pauseRows() {
+    return pauseItems().map(function (it, i) {
+      return { k: it.k, s: it.s,
+        x: W / 2 - PAUSE_W / 2, y: PAUSE_Y0 + i * (PAUSE_H + PAUSE_GAP),
+        w: PAUSE_W, h: PAUSE_H };
+    });
+  }
+  function pauseActivate(k) {
+    Sound.ui();
+    if (k === 'resume') { S.mode = 'play'; }
+    else if (k === 'restart') { startChapter(S.chapter); }
+    else if (k === 'select') { if (S.testing) { S.testing = false; goWorkshop(); } else goSelect(); }
+    else if (k === 'sound') { Sound.toggle(); }
+    else if (k === 'theme') { applyTheme((S.theme || 0) + 1); }
+  }
+
+  function drawPause() {
+    ctx.fillStyle = 'rgba(4,7,14,.9)';
+    ctx.fillRect(0, 0, W, H);
+    txt(ctx, '暂 停', W / 2, 142, { a: 'center', s: 48, c: PAL.ink, w: '800', glow: 'rgba(79,227,255,.6)', blur: 13 });
+    txt(ctx, chapLabel(), W / 2, 190,
+      { a: 'center', s: 15, c: PAL.cy, w: '600' });
+    txt(ctx, goalLabel() + '　·　剩 ' + S.hp + ' ♥', W / 2, 216, { a: 'center', s: 12.5, c: PAL.dim, w: '600' });
+
+    var rows = pauseRows();
+    for (var i = 0; i < rows.length; i++) {
+      var r = rows[i];
+      var hov = S.mouse.x >= r.x && S.mouse.x <= r.x + r.w && S.mouse.y >= r.y && S.mouse.y <= r.y + r.h;
+      ctx.fillStyle = hov ? 'rgba(79,227,255,.18)' : 'rgba(120,150,220,.07)';
+      rr(ctx, r.x, r.y, r.w, r.h, 9); ctx.fill();
+      if (hov) {
+        ctx.strokeStyle = 'rgba(79,227,255,.6)'; ctx.lineWidth = 1.4;
+        rr(ctx, r.x + .7, r.y + .7, r.w - 1.4, r.h - 1.4, 9); ctx.stroke();
+      }
+      txt(ctx, r.s, W / 2, r.y + r.h / 2, { a: 'center', s: 15, c: hov ? PAL.ink : 'rgba(205,225,255,.88)', w: '700' });
+    }
+    txt(ctx, 'Esc / 空格 继续　·　R 重开本章', W / 2, 528,
+      { a: 'center', s: 11.5, c: 'rgba(140,165,210,.75)', w: '500' });
+  }
+
+  function drawTitle() {
+    ctx.fillStyle = 'rgba(4,7,14,.82)';
+    ctx.fillRect(0, 0, W, H);
+    var bob = Math.sin(S.t * .045) * 5;
+    txt(ctx, '静 止', W / 2, 180 + bob, { a: 'center', s: 74, c: PAL.ink, w: '800', glow: 'rgba(79,227,255,.85)', blur: 16 });
+    txt(ctx, 'S T I L L', W / 2, 230 + bob, { a: 'center', s: 12, c: PAL.cy });
+
+    // 演示：圈里两个被钉住的石头 + 圈外三个还在扑过来的
+    var dx = W / 2, dy = 300;
+    ctx.save();
+    ctx.shadowColor = 'rgba(79,227,255,.8)'; ctx.shadowBlur = 22;
+    ctx.strokeStyle = 'rgba(140,240,255,.88)'; ctx.lineWidth = 2.2;
+    ctx.beginPath(); ctx.arc(dx, dy, 82, 0, 6.2832); ctx.stroke();
+    ctx.restore();
+    ctx.fillStyle = PAL.stone;
+    rr(ctx, dx - 34, dy - 30, 28, 26, 5); ctx.fill();
+    rr(ctx, dx + 8, dy + 2, 28, 26, 5); ctx.fill();
+    ctx.save();
+    ctx.shadowColor = 'rgba(255,157,77,.9)'; ctx.shadowBlur = 16;
+    ctx.fillStyle = PAL.orange;
+    rr(ctx, dx - 132, dy - 6, 28, 26, 6); ctx.fill();
+    rr(ctx, dx + 104, dy - 34, 28, 26, 6); ctx.fill();
+    rr(ctx, dx + 66, dy + 46, 28, 26, 6); ctx.fill();
+    ctx.restore();
+    ctx.fillStyle = PAL.cy;
+    rr(ctx, dx - 60, dy + 22, 18, 26, 6); ctx.fill();
+
+    var lines = [
+      '它们全都醒着，每一个都比你快 —— 除非你空着手。',
+      '鼠标划出的那个圈，是你能施加影响的全部范围。',
+      '圈里的会被钉住、被烧掉。可你每攥住一个，圈就小一圈，你也慢一分。'
+    ];
+    for (var i = 0; i < lines.length; i++) {
+      txt(ctx, lines[i], W / 2, 400 + i * 26, { a: 'center', s: 14.5, c: i === 2 ? PAL.gold : 'rgba(205,225,255,.9)', w: i === 2 ? '700' : '500' });
+    }
+    if (S.t % 70 < 46) txt(ctx, '按 任 意 键 开 始', W / 2, 484, { a: 'center', s: 16, c: PAL.gold, glow: 'rgba(255,209,102,.7)', blur: 16 });
+    // 自制关卡的入口在这儿。它本来就不是一章，不该混进选章的十三张卡里。
+    var mineN = mineList().length;
+    for (var tb = 0; tb < TBTN.length; tb++) {
+      var B = TBTN[tb];
+      var hov = S.mouse.x >= B.x && S.mouse.x <= B.x + B.w && S.mouse.y >= B.y && S.mouse.y <= B.y + B.h;
+      ctx.fillStyle = hov ? 'rgba(95,240,192,.24)' : 'rgba(95,240,192,.09)';
+      rr(ctx, B.x, B.y, B.w, B.h, 10); ctx.fill();
+      ctx.strokeStyle = hov ? 'rgba(95,240,192,.9)' : 'rgba(95,240,192,.35)'; ctx.lineWidth = 1.3;
+      rr(ctx, B.x + .7, B.y + .7, B.w - 1.4, B.h - 1.4, 10); ctx.stroke();
+      txt(ctx, tb === 0 ? '工坊 · 自己做一关（W）' : ('我的关卡 · ' + (mineN ? mineN + ' 张' : '还空着') + '（L）'),
+        B.x + B.w / 2, B.y + 22, { a: 'center', s: 13, c: PAL.mint, w: '800' });
+    }
+    txt(ctx, '← → 移动　空格 跳　S 下跳　鼠标 移动时间场　右键 脉冲　1/2 换武器　Esc 暂停', W / 2, 566, { a: 'center', s: 12, c: PAL.dim, w: '500' });
+    var sv = Save.get();
+    txt(ctx, CN_CHAPTERS.split('').join(' ') + ' 章　·　成就 ' + achCount() + '/' + ACHS.length + '　·　累计击杀 ' + (sv.totalKill || 0) +
+      '　·　' + ((sv.plays || 0) === 0 ? '还没开过局' : '第 ' + sv.plays + ' 次开局') +
+      (sv.cleared ? '　·　✓ 已通关' : ''),
+      W / 2, 588, { a: 'center', s: 11, c: 'rgba(120,145,190,.7)', w: '500' });
+    txt(ctx, '纯离线 · 无外部资源 · 音乐与画面都是现算的', W - 16, H - 12, { a: 'right', s: 10, c: 'rgba(90,110,150,.55)', w: '500' });
+  }
+
+  function drawOver() {
+    var a = clamp(S.over / 40, 0, 1);
+    ctx.fillStyle = 'rgba(3,6,12,' + (.80 * a) + ')';
+    ctx.fillRect(0, 0, W, H);
+    var C = CHAPTER();
+    txt(ctx, '停 止', W / 2, 186, { a: 'center', s: 52, c: PAL.red, w: '800', glow: 'rgba(255,77,94,.7)', blur: 13 });
+    txt(ctx, chapLabel(), W / 2, 250, { a: 'center', s: 21, c: PAL.ink, w: '700' });
+    ctx.fillStyle = 'rgba(120,145,200,.22)';
+    ctx.fillRect(W / 2 - 190, 284, 380, 1);
+    var rows = [
+      [winKind() === 'door' ? '门的状态' : '进度', winKind() === 'door' ? (S.door && S.door.open ? '开过' : '没开') : goalLabel()],
+      ['本章击杀', S.runKills + ' 个'],
+      ['坚持时长', (S.runT / 60).toFixed(1) + ' 秒'],
+      ['本章最高击杀', Math.max(S.runKills, Save.get().bestKill || 0) + ' 个']
+    ];
+    for (var i = 0; i < rows.length; i++) {
+      txt(ctx, rows[i][0], W / 2 - 20, 320 + i * 30, { a: 'right', s: 13.5, c: PAL.dim, w: '500' });
+      txt(ctx, rows[i][1], W / 2 + 20, 320 + i * 30, { a: 'left', s: 14.5, c: PAL.cy, w: '700' });
+    }
+    if (isFinale()) {
+      txt(ctx, '这一章不能攥着东西过去 —— 你得一路上都空着手。',
+        W / 2, 452, { a: 'center', s: 12.5, c: PAL.gold, w: '500' });
+    }
+    var left = Math.max(0, 3 - (S.fails % 3));
+    if (S.fails > 0 && S.mercy < 2 && left > 0) {
+      txt(ctx, '再失败 ' + left + ' 次，本章会给你加一点血上限',
+        W / 2, 480, { a: 'center', s: 11.5, c: 'rgba(67,245,176,.8)', w: '500' });
+    }
+    if (S.over > 55 && S.t % 70 < 46)
+      txt(ctx, '按 任 意 键 重 来 本 章', W / 2, 512, { a: 'center', s: 15, c: PAL.gold, glow: 'rgba(255,209,102,.7)', blur: 14 });
+  }
+
+  // ── 结局 ──
+  function drawEnding() {
+    ctx.fillStyle = '#04060c';
+    ctx.fillRect(0, 0, W, H);
+    var t = S.endingT;
+    var sv = Save.get();
+    var lines = [
+      { d: 25,  s: '门在你身后合上了。', sz: 24, c: PAL.ink },
+      { d: 120, s: '你走出去的时候，什么都没带。', sz: 16, c: 'rgba(200,220,250,.85)' },
+      { d: 230, s: '这一路你都在攥着东西。', sz: 15, c: 'rgba(170,195,235,.78)' },
+      { d: 300, s: '攥得越多，你能攥住的越少。', sz: 15, c: 'rgba(170,195,235,.78)' },
+      { d: 400, s: '最后你松了手，才走了出去。', sz: 18, c: PAL.cy },
+      { d: 540, s: '静 止', sz: 26, c: PAL.ink },
+      { d: 620, s: 'STILL', sz: 12, c: PAL.cy },
+      { d: 700, s: '累计击杀 ' + ((sv.totalKill || 0) + S.runKills) + '　·　摔了 ' + (sv.deaths || 0) + ' 次　·　成就 ' + achCount() + '/' + ACHS.length,
+        sz: 12, c: PAL.gold },
+      { d: 820, s: '按任意键回到标题', sz: 12, c: PAL.dim }
+    ];
+    for (var i = 0; i < lines.length; i++) {
+      if (t < lines[i].d) break;
+      var al = clamp((t - lines[i].d) / 30, 0, 1);
+      ctx.globalAlpha = al;
+      txt(ctx, lines[i].s, W / 2, 140 + i * 40, { a: 'center', s: lines[i].sz, c: lines[i].c, w: '700' });
+      ctx.globalAlpha = 1;
+    }
+    if (t > 840 && S.t % 70 < 46) {
+      txt(ctx, '（还有一件事：本喵在源代码的注释里留了一句话。）',
+        W / 2, H - 46, { a: 'center', s: 11.5, c: 'rgba(130,155,200,.75)', w: '500' });
+    }
+  }
+
+  // 暂停时战场是定格的，每帧重画一遍纯属浪费 ——
+  // 进来的时候拍一张，之后每帧只贴图（跟选章界面是同一笔账）。
+  var pauseSnap = null;
+  function drawScene(hideWorld) {
+    drawBg();
+    if (!hideWorld) {
+      drawArena();
+      drawBoss();          // 背景那只巨物：在竞技场之上、敌人之下
+      drawPlats();
+      var i;
+      for (i = 0; i < S.enemies.length; i++) if (S.enemies[i].held && !S.enemies[i].dead) drawHeldEnemy(S.enemies[i]);
+      drawCat();
+      for (i = 0; i < S.enemies.length; i++) if (S.enemies[i].live && !S.enemies[i].dead) drawLive(S.enemies[i]);
+      drawItems();
+      drawWarns();
+      drawBars();
+      drawGoal();
+      if (S.door) drawDoor();
+      drawBullets();
+      drawPlayer();
+    }
+    drawParts();
+  }
+  function ensurePauseSnap() {
+    if (pauseSnap) return;
+    try {
+      var c = document.createElement('canvas');
+      c.width = W; c.height = H;
+      var o = c.getContext('2d');
+      if (!o) return;
+      var real = ctx; ctx = o;              // 借同一套绘制代码，画进离屏
+      try { drawScene(false); } finally { ctx = real; }
+      pauseSnap = c;
+    } catch (e) { pauseSnap = null; }
+  }
+
+  function render() {
+    if (!ctx) return;
+    if (S.mode === 'pause') {
+      ensurePauseSnap();
+      ctx.save();
+      if (pauseSnap) ctx.drawImage(pauseSnap, 0, 0);
+      else { ctx.fillStyle = '#04070e'; ctx.fillRect(0, 0, W, H); }
+      ctx.restore();
+      drawPause();
+      return;
+    }
+    pauseSnap = null;                       // 离开暂停就丢掉，下次进来重拍
+    ctx.save();
+    if (S.shake > .2) ctx.translate(rnd(-S.shake, S.shake), rnd(-S.shake, S.shake));
+    // 全屏不透明界面（选章 / 结局）盖住了整个战场 —— 底下那些就别画了
+    var hideWorld = (S.mode === 'select' || S.mode === 'ending');
+    drawScene(hideWorld);
+    // 定格波：从角色身上扩散出去的那一圈
+    if (S.freezeFx > 0 && S.ch) {
+      ctx.save();
+      ctx.globalAlpha = Math.min(1, S.freezeFx * 1.2) * .85;
+      ctx.strokeStyle = PAL.cy;
+      ctx.lineWidth = 3 + S.freezeFx * 7;
+      ctx.shadowColor = 'rgba(79,227,255,.9)'; ctx.shadowBlur = 26;
+      ctx.beginPath();
+      ctx.arc(S.ch.x + PW / 2, S.ch.y + PH / 2, (1 - S.freezeFx) * 820, 0, 6.2832);
+      ctx.stroke();
+      ctx.restore();
+    }
+    if (S.mode === 'play') drawField();
+    if (S.mode === 'play') { drawHUD(); drawBanner(); drawFloats(); }
+    drawToasts();
+    drawGlitch();
+    if (Eggs.msgT > 0 && Eggs.msg) txt(ctx, Eggs.msg, W / 2, 96, { a: 'center', s: 18, c: PAL.pink, glow: 'rgba(255,93,132,.7)', blur: 16 });
+    if (S.flash > 0.01) {
+      ctx.globalAlpha = S.flash * .5;
+      ctx.fillStyle = PAL.red;
+      ctx.fillRect(0, 0, W, H);
+      ctx.globalAlpha = 1;
+    }
+    if (vgLayer) {
+      ctx.drawImage(vgLayer, 0, 0);
+    } else {
+      var vg = ctx.createRadialGradient(W / 2, H / 2, H * .34, W / 2, H / 2, H * .98);
+      vg.addColorStop(0, 'rgba(0,0,0,0)');
+      vg.addColorStop(1, 'rgba(0,0,0,.62)');
+      ctx.fillStyle = vg;
+      ctx.fillRect(0, 0, W, H);
+    }
+    if (S.mode === 'title') drawTitle();
+    else if (S.mode === 'select') drawSelect();
+    else if (S.mode === 'intro') drawIntro();
+    else if (S.mode === 'workshop') {
+      if (S.edit && S.edit.showCode) drawCodeScreen();
+      else if (S.editList) drawMineList();
+      else { drawWorkshop(); if (S.edit && S.edit.panel) drawRulePanel(); }
+    }
+    else if (S.mode === 'shop') drawShop();
+    // 离开分享码那一屏（或离开工坊）时，把盖在画布上的文本框收掉
+    if (codeEl && !(S.mode === 'workshop' && S.edit && S.edit.showCode)) hideCodeEl();
+    else if (S.mode === 'pause') drawPause();
+    else if (S.mode === 'clear') drawClear();
+    else if (S.mode === 'over') drawOver();
+    else if (S.mode === 'ending') drawEnding();
+    ctx.restore();
+  }
+
+  // ══════════════════════════════════════════════════════════════
+  // 13 · 输入
+  // ══════════════════════════════════════════════════════════════
+  function toLogical(e) {
+    if (!canvas || !canvas.getBoundingClientRect) return { x: 0, y: 0 };
+    var r = canvas.getBoundingClientRect();
+    var sc = ((r && r.width) ? r.width : W) / W || 1;
+    var lx = ((e.clientX || 0) - (r ? r.left : 0)) / sc;
+    var ly = ((e.clientY || 0) - (r ? r.top : 0)) / sc;
+    return { x: isFinite(lx) ? lx : 0, y: isFinite(ly) ? ly : 0 };
+  }
+
+  // 选章格子几何 —— 画和点用同一份，不会对不上
+  function selCols() { return CHAPTERS.length <= 12 ? 3 : 4; }   // 原来是 3，加了卡之后变 4 列
+  function selectCell(i) {
+    var COLS = selCols();
+    var cw = COLS === 3 ? 252 : 202, chh = 78, gx = COLS === 3 ? 18 : 14, gy = 12;
+    var tw = COLS * cw + (COLS - 1) * gx;
+    return {
+      x: (W - tw) / 2 + (i % COLS) * (cw + gx),
+      y: 116 + Math.floor(i / COLS) * (chh + gy),
+      w: cw, h: chh
+    };
+  }
+  // 打完「放手」之后，选章界面只剩一扇门亮着
+  function lockedToLast() {
+    var sv = Save.get();
+    return !!(sv.trueEnd && !sv.bossDown);
+  }
+  // 哪一关现在能点。三种状态一个函数说清：
+  //   没打赢「放手」      → 第13关是灰的，其余随便点
+  //   打赢了、boss 没死   → 只有第13关能点（上锁）
+  //   boss 也死了         → 全部恢复
+  function canPick(i) {
+    var sv = Save.get();
+    // last 是「最后一个真章节」（boss 那关），不是数组最后一项 ——
+    // 无限那张卡排在它后面，用 CHAPTERS.length-1 会让 boss 关上不了锁
+    var last = REAL_N - 1;
+    if (CHAPTERS[i] && CHAPTERS[i].infinite) return true;   // 无限模式永远开着
+    if (i === last) return !!sv.trueEnd;
+    return !(sv.trueEnd && !sv.bossDown);
+  }
+
+  function selectHit(p) {
+    for (var i = 0; i < CHAPTERS.length; i++) {
+      if (!canPick(i)) continue;
+      var c = selectCell(i);
+      if (p.x >= c.x && p.x <= c.x + c.w && p.y >= c.y && p.y <= c.y + c.h) return i;
+    }
+    return -1;
+  }
+
+  // 回首页。以前首页只是块过场，不留口子也就算了；
+  // 现在「工坊」和「我的关卡」挂在首页上，进得去出不来就是死胡同。
+  var HOME_BTN = [16, 34, 96, 40];
+  function goTitle() {
+    S.testing = false; S.editList = false;
+    dropCustom(); hideCodeEl();
+    S.mode = 'title'; S.bootT = 0;
+    Audio.wake(); Sound.ui();
+  }
+
+  function goSelect() {
+    S.testing = false;
+    S.editList = false; dropCustom();
+    S.mode = 'select'; S.selT = 0;
+    S.selIdx = clamp(S.selIdx, 0, CHAPTERS.length - 1);
+    Audio.wake(); Music.start(); Sound.ui();
+  }
+  function beginPlay() { S.mode = 'play'; S.introT = 0; Sound.ui(); Music.start(); }
+  function isCustomRun() { return !!(CHAPTERS[S.chapter] && CHAPTERS[S.chapter].__custom); }
+
+  function advanceClear() {
+    // 自制关打完就该回工坊接着改。它不是这一章、更不是终章 ——
+    // 之前它会掉进下面的「最后一章」分支，于是放起结局动画。
+    if (isCustomRun()) {
+      S.testing = false;
+      goWorkshop();
+      S.floats.push({ s: '打完了 · 接着改', x: W / 2, y: 130, t: 80, c: PAL.mint });
+      return;
+    }
+    var sv = Save.get();
+    sv.cleared = false;
+    // 「放手」通过 → 不是结局。门后面还有东西，真终章这时候才放出来。
+    if (CHAPTERS[S.chapter] && CHAPTERS[S.chapter].finale && !sv.bossDown) {
+      sv.trueEnd = true;
+      Save.flush();
+      goSelect();
+      S.selIdx = CHAPTERS.length - 1;
+      banner('真的结束了吗？', PAL.red);
+      return;
+    }
+    if (S.chapter >= CHAPTERS.length - 1) {
+      sv.cleared = true;
+      Save.flush();
+      S.mode = 'ending'; S.endingT = 0;
+      unlock('ending');
+    } else {
+      Save.flush();
+      startChapter(S.chapter + 1);
+    }
+    Sound.ui();
+  }
+
+  function onKeyDown(e) {
+    var k = e.key;
+    // Tab 原来漏在外面 —— 浏览器会拿它去移焦点，按一下焦点就跑了
+    var nav = (k === ' ' || k === 'Spacebar' || k === 'Enter' || k === 'Tab' || k.indexOf('Arrow') === 0);
+    if (nav && e.preventDefault) e.preventDefault();
+    if (S.mode === 'workshop' && k === 'Tab' && e.preventDefault) e.preventDefault();
+
+    // F9：作弊键，加 999 金币。任何界面都能按，包括标题页 —— 老板自己人用的。
+    // 满 999 就归零重来，免得刷太多次数字难看。
+    // F8：帧率表。低配机上卡在哪一屏，打开它截图给本喵看。
+    if (k === 'F8') {
+      if (e.preventDefault) e.preventDefault();
+      S.showFps = !S.showFps;
+      S._ft = [];
+      return;
+    }
+    if (k === 'F9') {
+      if (e.preventDefault) e.preventDefault();
+      addCoins(999);
+      S.floats.push({ s: '+999 金币', x: W / 2, y: 128, t: 80, c: PAL.gold });
+      Sound.pick();
+      return;
+    }
+
+
+    if (S.mode === 'title') {
+      // 首页的两个自制关卡入口要排在「任意键开始」前面
+      if (k === 'w' || k === 'W') { goWorkshop(); return; }
+      if (k === 'l' || k === 'L') { goWorkshop(); S.editList = true; return; }
+      goSelect(); return;
+    }
+    if (S.mode === 'select') {
+      if (k === 'ArrowLeft' || k === 'a' || k === 'A') { S.selIdx = (S.selIdx + CHAPTERS.length - 1) % CHAPTERS.length; Sound.ui(); }
+      else if (k === 'ArrowRight' || k === 'd' || k === 'D') { S.selIdx = (S.selIdx + 1) % CHAPTERS.length; Sound.ui(); }
+      // 上下 = 跳一整行。原来是写死的 3 —— 4 列之后按 ↓ 是斜着走的
+      else if (k === 'ArrowUp' || k === 'w' || k === 'W') { S.selIdx = (S.selIdx + CHAPTERS.length - selCols()) % CHAPTERS.length; Sound.ui(); }
+      else if (k === 'ArrowDown' || k === 's' || k === 'S') { S.selIdx = (S.selIdx + selCols()) % CHAPTERS.length; Sound.ui(); }
+      else if (k === ' ' || k === 'Enter') {
+        if (canPick(S.selIdx)) startChapter(S.selIdx);
+      }
+      else if (k === 'b' || k === 'B') goShop();
+      else if (k === 'Escape' || k === 'Backspace') goTitle();
+      return;
+    }
+    if (S.mode === 'workshop') {
+      var ed = S.edit;
+      if (!ed) return;
+      if (ed.showCode) { if (k === 'c' || k === 'C' || k === 'Escape') { ed.showCode = false; hideCodeEl(); Sound.ui(); } return; }
+      if (S.editList) {
+        if (k === 'Escape' || k === 'l' || k === 'L') { S.editList = false; Sound.ui(); }
+        return;
+      }
+      if (k === 'Escape') {
+        if (ed.panel) { ed.panel = false; ed.slide = null; Sound.ui(); return; }   // 先关面板，再谈退出
+        goTitle(); return;                                                          // 工坊挂在首页下，回首页
+      }
+      if (k === 'Tab') { ed.tab = (ed.tab + 1) % 3; Sound.ui(); return; }          // 画台 → 放物 → 旗子
+      if (k === 'r' || k === 'R') { ed.panel = !ed.panel; ed.slide = null; Sound.ui(); return; }
+      if (k === 'z' || k === 'Z') {                                                // 撤销
+        if (doUndo()) Sound.thaw(); else Sound.ui();                                // 面板开着也照样撤
+        return;
+      }
+      // 数值的键盘快捷方式。滑块是主入口，但这几个键上一轮就有，不能因为我重写就没了。
+      // 不记撤销：一次按键一格，记了会把撤销栈冲干净。
+      if (k === '[') { ed.gap = Math.max(24,  ed.gap - 8); Sound.ui(); return; }
+      if (k === ']') { ed.gap = Math.min(400, ed.gap + 8); Sound.ui(); return; }
+      if (k === 'q' || k === 'Q') { ed.need = Math.max(needRange()[0], ed.need - 1); Sound.ui(); return; }
+      if (k === 'e' || k === 'E') { ed.need = Math.min(needRange()[1], ed.need + 1); Sound.ui(); return; }
+      // 面板开着的时候键盘让位 —— 数字键在那边是「出什么怪」，在这儿会打架
+      if (ed.panel) return;
+      if (k === 'Enter') { playCustom(ed); return; }                                // 试玩：不落盘、不留卡
+      if (k === 'c' || k === 'C') { ed.showCode = true; showCodeEl(editEncode(ed)); Sound.ui(); return; }
+      if (k === 'l' || k === 'L') { S.editList = true; Sound.ui(); return; }
+      if (k === 's' || k === 'S') { askName(true); return; }                        // 生成
+      if (k === 'x' || k === 'X') {                                                 // 清空（留着撤销栈）
+        pushUndo();
+        var ku = ed.undo, kn = ed.name, kw = ed.win;
+        S.edit = freshEdit();
+        S.edit.undo = ku; S.edit.name = kn; S.edit.win = kw;
+        S.edit.goal = (ed.goal || S.edit.goal).slice();
+        Sound.thaw(); return;
+      }
+      if (k === 'v' || k === 'V') {
+        var got = null;
+        try { got = window.prompt('把分享码粘进来：', ''); } catch (err) {}
+        var dec = got ? editDecode(got) : null;
+        if (dec) { dec.undo = ed.undo; S.edit = dec; S.editList = false; Sound.pick(); }
+        else if (got) { Sound.thaw(); S.floats.push({ s: '这段码看不懂', x: W / 2, y: 130, t: 70, c: PAL.red }); }
+        return;
+      }
+      if (k >= '1' && k <= '5') {                 // 出什么怪，1~5 开关
+        var ti = +k - 1, at = ed.types.indexOf(ti);
+        pushUndo();
+        if (at >= 0) { if (ed.types.length > 1) ed.types.splice(at, 1); }
+        else ed.types.push(ti);
+        ed.types.sort();
+        Sound.ui(); return;
+      }
+      if (ed.tab === 1 && (k === 'i' || k === 'I')) { ed.item = (ed.item + 1) % ITEM_ORDER.length; Sound.ui(); return; }
+      return;
+    }
+    if (S.mode === 'shop') {
+      if (k === 'Escape' || k === 'b' || k === 'B') { goSelect(); return; }
+      if (k === '1' || k === '2' || k === '3') { buyWeapon(Number(k) - 1); return; }
+      return;
+    }
+    if (S.mode === 'pause') {
+      if (k === 'Escape' || k === ' ' || k === 'Spacebar' || k === 'Enter') pauseActivate('resume');
+      else if (k === 'r' || k === 'R') pauseActivate('restart');
+      else if (k === 'q' || k === 'Q') { if (S.testing) { S.testing = false; goWorkshop(); } else pauseActivate('select'); }
+      else if (k === 'm' || k === 'M') pauseActivate('sound');
+      return;
+    }
+    if (S.mode === 'intro') {
+      // 卡片上写什么就得真能去 —— 自制关是从首页来的，别把人扔回选章
+      if (k === 'Escape') { if (S.testing) { S.testing = false; goWorkshop(); } else goSelect(); return; }
+      if (S.introT > 36) beginPlay();
+      return;
+    }
+    if (S.mode === 'clear') { if (S.clearT > 34) advanceClear(); return; }
+    if (S.mode === 'over') { if (S.over > 55) startChapter(S.chapter); return; }
+    if (S.mode === 'ending') { if (S.endingT > 200) { S.mode = 'title'; S.bootT = 0; } return; }
+
+    if (k === 'Escape') { S.mode = 'pause'; S.pauseT = 0; Sound.ui(); return; }
+    if (k === 'r' || k === 'R') { startChapter(S.chapter); return; }
+    if (k === '1' || k === '2' || k === '3') {          // 换武器（买了才能用）
+      var wi = Number(k) - 1;
+      if (owns(wi)) { S.weapon = wi; Sound.pick(); }
+      else { Sound.thaw(); S.floats.push({ s: '没买 · ' + WEAPONS[wi].n, x: W / 2, y: 128, t: 60, c: PAL.red }); }
+      return;
+    }
+
+    keys[k] = true;
+    checkKonami(k);
+    if (k.length === 1) {
+      Eggs.typed = (Eggs.typed + k.toLowerCase()).slice(-8);
+      if (Eggs.typed.indexOf('cat') >= 0 || Eggs.typed.indexOf('miao') >= 0) { Eggs.typed = ''; spawnCat(); }
+    }
+    if (k === '喵') spawnCat();
+  }
+  function onKeyUp(e) { keys[e.key] = false; }
+
+  function onMove(e) {
+    try {
+      var mv = toLogical(e);
+      if (S.mode === 'workshop' && S.edit && S.edit.slide && S.mouse.down) setSlide(S.edit.slide, mv.x);
+    } catch (err) {}
+    try {
+      if (S.mode === 'workshop' && S.edit && S.edit.drag) {
+        var lp = toLogical(e);
+        S.edit.drag.x1 = Math.round(lp.x); S.edit.drag.y1 = Math.round(lp.y);
+      }
+    } catch (err) {}
+    var p = toLogical(e);
+    S.mouse.x = p.x; S.mouse.y = p.y;
+  }
+  function onDown(e) {
+    var p = toLogical(e);
+    S.mouse.x = p.x; S.mouse.y = p.y; S.mouse.down = true;
+    if (e.preventDefault) e.preventDefault();
+
+    if (S.mode === 'title') {
+      for (var tb2 = 0; tb2 < TBTN.length; tb2++) {
+        var B2 = TBTN[tb2];
+        if (p.x >= B2.x && p.x <= B2.x + B2.w && p.y >= B2.y && p.y <= B2.y + B2.h) {
+          goWorkshop();
+          if (tb2 === 1) S.editList = true;
+          return;
+        }
+      }
+      goSelect(); return;
+    }
+    if (S.mode === 'select') {
+      if (p.x >= W - 168 && p.x <= W - 20 && p.y >= 34 && p.y <= 74) { goShop(); return; }
+      var hbb = HOME_BTN;
+      if (p.x >= hbb[0] && p.x <= hbb[0] + hbb[2] && p.y >= hbb[1] && p.y <= hbb[1] + hbb[3]) { goTitle(); return; }
+      var hit = selectHit(p);
+      if (hit >= 0) { S.selIdx = hit; startChapter(hit); }
+      return;
+    }
+    if (S.mode === 'pause') {
+      var rows = pauseRows();
+      for (var ri = 0; ri < rows.length; ri++) {
+        var pr = rows[ri];
+        if (p.x >= pr.x && p.x <= pr.x + pr.w && p.y >= pr.y && p.y <= pr.y + pr.h) { pauseActivate(pr.k); return; }
+      }
+      return;
+    }
+    if (S.mode === 'intro') { if (S.introT > 36) beginPlay(); return; }
+    if (S.mode === 'clear') { if (S.clearT > 34) advanceClear(); return; }
+    if (S.mode === 'over') { if (S.over > 55) startChapter(S.chapter); return; }
+    if (S.mode === 'ending') { if (S.endingT > 200) { S.mode = 'title'; S.bootT = 0; } return; }
+
+    if (S.mode === 'workshop') {
+      var we = S.edit; if (!we || we.showCode) return;
+      if (S.editList) {                // 我的关卡：每一行的按钮
+        var rws = mineRows(), L2 = mineList();
+        if (e.button === 0) {
+          for (var wi2 = 0; wi2 < rws.length; wi2++) {
+            var r2 = rws[wi2], hit = function (q) { return p.x >= q[0] && p.x <= q[0] + q[2] && p.y >= q[1] && p.y <= q[1] + q[3]; };
+            if (hit(r2.edit)) { var d1 = editDecode(L2[r2.i].c); if (d1) { S.edit = d1; S.editList = false; Sound.pick(); } return; }
+            if (hit(r2.play)) { var d2 = editDecode(L2[r2.i].c); if (d2) { S.edit = d2; playCustom(d2); } return; }
+            if (hit(r2.del))  { L2.splice(r2.i, 1); Save.flush(); Sound.thaw(); return; }
+          }
+        }
+        return;
+      }
+      if (we.panel) {                  // 规矩面板
+        if (e.button !== 0) return;
+        if (!hit2(p, [PG.x, PG.y, PG.w, PG.h])) { we.panel = false; Sound.ui(); return; }
+        if (hit2(p, nameBox())) { askName(false); return; }
+        for (var wi3 = 0; wi3 < WINS.length; wi3++) {
+          if (hit2(p, winChip(wi3))) {
+            if (we.win !== WINS[wi3].k) {
+              pushUndo();
+              we.win = WINS[wi3].k;
+              // 同一个数字在两种条件下意思不同（个 / 秒），切换时夹进新范围
+              we.need = we.win === 'survive' ? Math.max(5, Math.min(120, we.need)) : Math.max(1, Math.min(99, we.need));
+            }
+            Sound.ui(); return;
+          }
+        }
+        if (we.win === 'reach' && hit2(p, quietBox())) { pushUndo(); we.goalQuiet = !we.goalQuiet; Sound.ui(); return; }
+        for (var ti3 = 0; ti3 < EDIT_TYPES.length; ti3++) {
+          if (hit2(p, typeChip(ti3))) {
+            var at3 = we.types.indexOf(ti3);
+            pushUndo();
+            if (at3 >= 0) { if (we.types.length > 1) we.types.splice(at3, 1); }
+            else we.types.push(ti3);
+            we.types.sort();
+            Sound.ui(); return;
+          }
+        }
+        for (var ki3 = 0; ki3 < TPLS.length; ki3++) {
+          if (hit2(p, tplChip(ki3))) { applyTpl(ki3); Sound.pick(); return; }
+        }
+        var sw3 = sliderWhich(p.y);
+        if (sw3 === 'need' && we.win === 'reach') sw3 = null;   // 那一行放的是「空手」开关
+        if (sw3 && p.x >= PG.sx - 16 && p.x <= PG.sx + PG.sw + 16) { we.slide = sw3; setSlide(sw3, p.x); Sound.ui(); return; }
+        return;
+      }
+      if (e.button === 0) {
+        for (var bi = 0; bi < BTN.length; bi++) {          // 右上角那排按钮
+          var B2 = BTN[bi];
+          if (p.x >= B2.x && p.x <= B2.x + BTN_W && p.y >= BTN_Y && p.y <= BTN_Y + BTN_H) {
+            if (B2.k === 'rule') { we.panel = true; Sound.ui(); }
+            else if (B2.k === 'test') playCustom(we);
+            else if (B2.k === 'save') askName(true);
+            else if (B2.k === 'mine') { S.editList = true; Sound.ui(); }
+            else if (B2.k === 'code') { we.showCode = true; showCodeEl(editEncode(we)); Sound.ui(); }
+            return;
+          }
+        }
+        for (var mi3 = 0; mi3 < 3; mi3++) {                // 三种笔
+          if (hit2(p, [SL.chipA, SL.chipB, SL.chipC][mi3])) { we.tab = mi3; Sound.ui(); return; }
+        }
+        for (var wp3 = 0; wp3 < WEAPONS.length; wp3++) {   // 起手武器
+          if (hit2(p, wepChip(wp3))) {
+            if ((we.wep || 0) !== wp3) { pushUndo(); we.wep = wp3; }
+            Sound.ui(); return;
+          }
+        }
+      }
+      if (e.button === 2) {            // 右键：删掉鼠标下的东西
+        for (var pi = we.plats.length - 1; pi >= 0; pi--) {
+          var pq = we.plats[pi];
+          if (p.x >= pq[0] && p.x <= pq[0] + pq[2] && p.y >= pq[1] - 6 && p.y <= pq[1] + pq[3] + 6) {
+            pushUndo(); we.plats.splice(pi, 1); Sound.thaw(); return;
+          }
+        }
+        for (var ii = we.items.length - 1; ii >= 0; ii--) {
+          if (Math.hypot(p.x - we.items[ii][1], p.y - we.items[ii][2]) < 26) {
+            pushUndo(); we.items.splice(ii, 1); Sound.thaw(); return;
+          }
+        }
+        return;
+      }
+      if (we.tab === 2) {              // 旗子：点一下把目标挪过去
+        if (e.button !== 0) return;
+        var gs = we.goal || [0, 0, 120, 60];
+        pushUndo();
+        we.goal = [Math.round(p.x - gs[2] / 2), Math.round(p.y - gs[3] / 2), gs[2], gs[3]];
+        Sound.pick(); return;
+      }
+      if (we.tab === 1) {              // 放道具
+        pushUndo();
+        we.items.push([we.item, Math.round(p.x), Math.round(p.y)]);
+        Sound.pick(); return;
+      }
+      pushUndo();
+      we.drag = { x0: Math.round(p.x), y0: Math.round(p.y), x1: Math.round(p.x), y1: Math.round(p.y) };
+      return;
+    }
+    if (S.mode === 'shop') {
+      var srows = shopRows();
+      for (var sr = 0; sr < srows.length; sr++) {
+        var si = srows[sr];
+        if (p.x >= si.x && p.x <= si.x + si.ww && p.y >= si.y && p.y <= si.y + si.hh) { buyWeapon(si.i); return; }
+      }
+      return;
+    }
+    if (S.mode === 'play' && e.button === 2 && has('pulse')) firePulse();   // 右键：脉冲（第 2 关才教）
+  }
+  function onUp() {
+    S.mouse.down = false;
+    if (S.edit) S.edit.slide = null;
+    // 松开鼠标 = 跳台画完了
+    var de = S.edit;
+    if (S.mode === 'workshop' && de && de.drag) {
+      var d = de.drag;
+      var x = Math.min(d.x0, d.x1), y = Math.min(d.y0, d.y1);
+      var w = Math.abs(d.x1 - d.x0), hh = Math.max(18, Math.abs(d.y1 - d.y0));
+      if (w >= 40) de.plats.push([Math.round(x), Math.round(y), Math.round(w), Math.round(hh)]);
+      de.drag = null;
+      Sound.pick();
+    }
+  }
+
+  // ══════════════════════════════════════════════════════════════
+  // 14 · 主循环
+  // ══════════════════════════════════════════════════════════════
+  var lastTS = 0, acc = 0, STEPMS = 1000 / 60, frameId = null;
+
+  function loop(ts) {
+    if (frameId !== null) requestAnimationFrame(loop);
+    if (!lastTS) lastTS = ts;
+    var dt = ts - lastTS;
+    lastTS = ts;
+    if (!isFinite(dt) || dt < 0) dt = STEPMS;
+    if (dt > 200) dt = 200;
+    acc += dt;
+    var guard = 0;
+    while (acc >= STEPMS && guard++ < 6) { step(); acc -= STEPMS; }
+    render();
+  }
+
+  function resize() {
+    if (!canvas || !canvas.style || typeof window === 'undefined') return;
+    var vw = window.innerWidth || W, vh = window.innerHeight || H;
+    var sc = Math.min(vw / W, vh / H);
+    if (!isFinite(sc) || sc <= 0) sc = 1;
+    canvas.style.width = Math.floor(W * sc) + 'px';
+    canvas.style.height = Math.floor(H * sc) + 'px';
+  }
+
+  function setFavicon() {
+    try {
+      var c = document.createElement('canvas');
+      c.width = 32; c.height = 32;
+      var g = c.getContext('2d');
+      if (!g) return;
+      g.fillStyle = '#060a14'; g.fillRect(0, 0, 32, 32);
+      g.strokeStyle = '#4fe3ff'; g.lineWidth = 3;
+      g.beginPath(); g.arc(16, 16, 11, 0, 6.2832); g.stroke();
+      g.fillStyle = '#39425c'; g.fillRect(11, 13, 10, 9);
+      var l = document.createElement('link');
+      l.rel = 'icon'; l.href = c.toDataURL('image/png');
+      document.head.appendChild(l);
+    } catch (e) {}
+  }
+
+  function boot() {
+    if (typeof document === 'undefined' || !document.getElementById) return false;
+    canvas = document.getElementById('game');
+    if (!canvas || !canvas.getContext) return false;
+    ctx = canvas.getContext('2d');
+    if (!ctx) return false;
+
+    var dpr = 1;
+    try { dpr = Math.min((window.devicePixelRatio || 1), 2); } catch (e) { dpr = 1; }
+    canvas.width = Math.floor(W * dpr);
+    canvas.height = Math.floor(H * dpr);
+    if (ctx.setTransform) ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+
+    // restore() 会回滚 font，字体缓存必须跟着失效 —— 否则会画错字体
+    try {
+      if (ctx.restore) {
+        var _rawRestore = ctx.restore.bind(ctx);
+        ctx.restore = function () { _fontCache = ''; _rawRestore(); };
+      }
+    } catch (e) {}
+
+    resize();
+    if (window.addEventListener) {
+      window.addEventListener('resize', resize);
+      window.addEventListener('keydown', onKeyDown, false);
+      window.addEventListener('keyup', onKeyUp, false);
+      window.addEventListener('mouseup', onUp, false);
+      window.addEventListener('blur', function () { for (var k in keys) keys[k] = false; onUp(); }, false);
+    }
+    if (canvas.addEventListener) {
+      canvas.addEventListener('mousemove', onMove, false);
+      canvas.addEventListener('mousedown', onDown, false);
+      canvas.addEventListener('touchstart', function (e) {
+        if (!e.touches || !e.touches.length) return;
+        onDown({ clientX: e.touches[0].clientX, clientY: e.touches[0].clientY, preventDefault: function () { if (e.preventDefault) e.preventDefault(); } });
+      }, false);
+      canvas.addEventListener('touchmove', function (e) {
+        if (!e.touches || !e.touches.length) return;
+        onMove({ clientX: e.touches[0].clientX, clientY: e.touches[0].clientY });
+        if (e.preventDefault) e.preventDefault();
+      }, false);
+      canvas.addEventListener('touchend', function () { onUp(); }, false);
+      canvas.addEventListener('contextmenu', function (e) { if (e.preventDefault) e.preventDefault(); }, false);
+    }
+
+    setFavicon();
+    bakeLayers();               // 静态图层只烘焙一次
+    applyTheme(Save.get().theme || 0, true);
+    startChapter(0, true);      // 只为把状态铺好，不记开局数
+    S.mode = 'title';
+    S.bootT = 0;
+
+    try {
+      var v = document.getElementById('veil');
+      if (v && v.className !== undefined) {
+        setTimeout(function () { v.className = 'gone'; }, 200);
+        setTimeout(function () { if (v.parentNode) v.parentNode.removeChild(v); }, 900);
+      }
+    } catch (e) {}
+
+    frameId = 1;
+    if (typeof requestAnimationFrame === 'function') requestAnimationFrame(loop);
+
+    try {
+      console.log('%c静 止  %cSTILL', 'color:#4fe3ff;font-size:22px;font-weight:800', 'color:#7f8fb4;font-size:12px');
+      console.log('%c规则只有一条：圈里是活的，圈外是石头。', 'color:#ffd166;font-size:13px');
+      console.log('%c试试：STILL.bot() 让机器人替你打一局', 'color:#43f5b0;font-size:12px');
+    } catch (e) {}
+    return true;
+  }
+
+  // ══════════════════════════════════════════════════════════════
+  // 15 · 对外接口（测试 / 控制台）
+  // ══════════════════════════════════════════════════════════════
+  var API = {
+    W: W, H: H, S: S, TYPES: TYPES, CHAPTERS: CHAPTERS,
+    boot: boot, step: step, render: render,
+    startChapter: startChapter, resetRun: resetRun, beginPlay: beginPlay,
+    goSelect: goSelect, advanceClear: advanceClear, finishGame: finishGame,
+    applyTheme: applyTheme, THEMES: THEMES,
+    chapterClear: chapterClear, freezeWorld: freezeWorld,
+    getState: function () { return S; },
+    aim: function (x, y) { S.mouse.x = x; S.mouse.y = y; },
+    W: W, H: H, PW: PW, PH: PH, FLOOR: FLOOR,
+    moveSpeed: moveSpeed, applyItem: applyItem, ITEMS: ITEMS, pauseActivate: pauseActivate,
+    rollDrop: rollDrop, updateItems: updateItems,
+    tutStage: tutStage, tutSet: tutSet, tutLine: tutLine,
+    isBoss: isBoss, updateBoss: updateBoss, bossDown: bossDown,
+    updateWaves: updateWaves, infSetupWave: infSetupWave, REAL_N: REAL_N,
+    spawnInfBoss: spawnInfBoss,
+    goWorkshop: goWorkshop, editEncode: editEncode, editDecode: editDecode, selCols: selCols,
+    playCustom: playCustom, freshEdit: freshEdit, ITEM_ORDER: ITEM_ORDER,
+    chapLabel: chapLabel, wrapCode: wrapCode, showCodeEl: showCodeEl, hideCodeEl: hideCodeEl,
+    customRun: customRun, wepChip: wepChip,
+    TBTN: TBTN, isCustomRun: isCustomRun, goTitle: goTitle, HOME_BTN: HOME_BTN,
+    mineList: mineList, mineRows: mineRows, saveLevel: saveLevel, dropCustom: dropCustom,
+    setSlide: setSlide, knobX: knobX, SL: SL, PG: PG, BTN: BTN, WINS: WINS, TPLS: TPLS,
+    pushUndo: pushUndo, doUndo: doUndo, winText: winText, applyTpl: applyTpl, askName: askName,
+    nameBox: nameBox, quietBox: quietBox, winChip: winChip, typeChip: typeChip, tplChip: tplChip,
+    sliderWhich: sliderWhich, needRange: needRange, escName: escName,
+    lockedToLast: function () { return lockedToLast(); },
+    selectCell: selectCell, selectHit: selectHit, canPick: canPick,
+    WEAPONS: WEAPONS, WEP: WEP, owns: owns, buyWeapon: buyWeapon, goShop: goShop,
+    addCoins: addCoins, ABILITY_AT: ABILITY_AT, has: has,
+    winKind: winKind, goalMet: goalMet, goalLabel: goalLabel, goalBrief: goalBrief,
+    pulse: firePulse, spawnCat: spawnCat,
+    solidBoxes: solidBoxes, isFinale: isFinale, Music: Music, Sound: Sound,
+    spawn: function (type, x, y) { var e = makeEnemy(type, x, y, S.chapter); S.enemies.push(e); return e; },
+    unlock: unlock, ACH: ACH, ACHS: ACHS, Eggs: Eggs, Save: Save,
+    _press: function (k) { keys[k] = true; },
+    _release: function (k) { keys[k] = false; },
+    _releaseAll: function () { for (var k in keys) keys[k] = false; },
+    _key: function (k) { onKeyDown({ key: k, preventDefault: function () {} }); onKeyUp({ key: k }); },
+    _keyPD: function (k) { var hit = false;
+      onKeyDown({ key: k, preventDefault: function () { hit = true; } }); onKeyUp({ key: k }); return hit; },
+    _move: function (x, y) { onMove({ clientX: x, clientY: y }); },
+    _click: function (x, y) { onDown({ clientX: x, clientY: y, button: 0, preventDefault: function () {} }); onUp(); },
+    _down: function (x, y, b) { onDown({ clientX: x, clientY: y, button: b || 0, preventDefault: function () {} }); },
+    _up: function () { onUp(); }
+  };
+  try { if (typeof window !== 'undefined') window.STILL = API; } catch (e) {}
+  try { if (typeof globalThis !== 'undefined') globalThis.STILL = API; } catch (e) {}
+
+  try {
+    if (typeof document !== 'undefined' && document.getElementById) {
+      var el = document.getElementById('game');
+      if (el && el.getContext) boot();
+    }
+  } catch (e) {
+    try { console.error('[STILL] boot failed:', e); } catch (e2) {}
+  }
+
+})();
+</script>
+</body>
+</html>

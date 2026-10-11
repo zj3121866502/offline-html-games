@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>围棋 · 双人对弈</title>
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+<header class="topbar">
+  <div class="brand">围棋 <span class="brand-sub">双人对弈 · 中国规则</span></div>
+  <div class="topbar-controls">
+    <label class="inline-label">棋盘风格
+      <select id="boardStyle">
+        <option value="wood">木纹</option>
+        <option value="sakura">樱花</option>
+        <option value="jiangnan">江南烟雨</option>
+      </select>
+    </label>
+    <label class="switch-label"><input type="checkbox" id="confirmToggle"><span>确认落子</span></label>
+  </div>
+</header>
+
+<main>
+  <section class="status-bar" id="statusBar">
+    <div class="turn-indicator">
+      <span id="turnStone" class="stone-icon black"></span>
+      <span id="turnText">准备开局</span>
+    </div>
+    <div class="captures">
+      <span>黑提子 <b id="capB">0</b></span>
+      <span>白提子 <b id="capW">0</b></span>
+      <span>第 <b id="moveNo">0</b> 手</span>
+    </div>
+  </section>
+
+  <div id="notice" class="notice hidden"></div>
+
+  <section class="board-wrap">
+    <canvas id="board" width="760" height="760">你的浏览器不支持画布</canvas>
+  </section>
+
+  <section class="controls" id="controlsRow">
+    <button id="btnPass" class="btn primary">虚手</button>
+    <button id="btnUndo" class="btn">悔棋</button>
+    <button id="btnResign" class="btn danger">认输</button>
+    <button id="btnNew" class="btn">新对局</button>
+  </section>
+
+  <section id="scoringPanel" class="panel hidden">
+    <h2>数子</h2>
+    <p class="hint">双方连续虚手，进入数子。系统已用红 ✕ 预标死子——自动判定可能有误，请务必逐块检查：点击棋块切换死/活，盘面上小色块表示空点归属。</p>
+    <div class="row">
+      <button id="btnResetDead" class="btn">重设为自动判定</button>
+      <button id="btnBackPlay" class="btn">返回对局</button>
+      <button id="btnConfirmScore" class="btn primary">确认数子</button>
+    </div>
+  </section>
+
+  <section id="resultPanel" class="panel hidden">
+    <h2 id="resultTitle">对局结束</h2>
+    <div id="resultDetail" class="result-detail"></div>
+    <div class="row"><button id="btnAgain" class="btn primary">再来一局</button></div>
+  </section>
+
+  <section id="setupPanel" class="panel">
+    <h2>新对局</h2>
+    <p class="hint">双人对弈时黑白在同一设备上轮流点击落子；选电脑对手则由 AI 执另一方棋子。黑先白后，落子无悔；双方连续虚手即终局，进入数子。</p>
+    <div class="row">
+      <label class="inline-label">棋盘大小
+        <select id="boardSize">
+          <option value="19" selected>19 路</option>
+          <option value="13">13 路</option>
+          <option value="9">9 路</option>
+        </select>
+      </label>
+      <label class="inline-label">对手
+        <select id="opponent">
+          <option value="human" selected>双人</option>
+          <option value="easy">电脑 · 简单</option>
+          <option value="medium">电脑 · 中等</option>
+          <option value="hard">电脑 · 困难</option>
+        </select>
+      </label>
+      <label class="inline-label hidden" id="playerColorLabel">你执
+        <select id="playerColor">
+          <option value="b" selected>黑（先行）</option>
+          <option value="w">白</option>
+        </select>
+      </label>
+      <button id="btnStart" class="btn primary">开始对局</button>
+    </div>
+  </section>
+
+  <footer class="rules-note">
+    中国规则 · 数子法：得分 = 盘上棋子 + 围住的空点，白棋贴 7.5 目（即黑贴 3¾ 子）。
+    落子后无气且提不了对方子的点为禁着点；不得重现任何曾出现过的整盘局面（打劫须先在他处落子）。
+  </footer>
+</main>
+
+<div id="toast" class="toast hidden"></div>
+
+<script src="js/engine.js"></script>
+<script src="js/go-mcts.js"></script>
+<script src="js/app.js"></script>
+</body>
+</html>

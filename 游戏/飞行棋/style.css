@@ -1,0 +1,119 @@
+/* 飞行棋 —— 样式。兼容约定：只用 2020 年以前的 CSS（无 flex gap / inset / aspect-ratio）。 */
+* { margin: 0; padding: 0; box-sizing: border-box; }
+html, body { height: 100%; }
+body {
+  font-family: "Microsoft YaHei", "PingFang SC", sans-serif;
+  background: #efe6d2;
+  color: #4a3b22;
+  overflow: hidden;
+}
+
+#wrap { display: flex; height: 100%; padding: 10px; }
+#boardWrap { flex: 1 1 auto; display: flex; align-items: center; justify-content: center; min-width: 0; }
+#board { width: 100%; height: 100%; max-width: 100vh; max-height: 100%; display: block; }
+
+#side {
+  flex: 0 0 240px; margin-left: 12px;
+  display: flex; flex-direction: column;
+  background: #fbf4e2; border: 1px solid #dcc99f; border-radius: 12px;
+  padding: 14px 12px;
+}
+#gtitle { font-size: 22px; font-weight: bold; color: #7a4a12; text-align: center; letter-spacing: 8px; }
+#turnBox { margin-top: 10px; text-align: center; font-size: 15px; }
+#turnName { font-size: 17px; }
+#againTag { color: #b0651a; font-size: 13px; margin-left: 4px; }
+
+#diceBox { display: flex; align-items: center; justify-content: center; margin-top: 10px; }
+.die {
+  font-size: 46px; line-height: 1; color: #4a3b22;
+  text-shadow: 0 2px 3px rgba(0,0,0,.2);
+  cursor: default; user-select: none;
+}
+#diceBox.rolling .die { animation: shake .12s infinite; }
+@keyframes shake {
+  0% { transform: rotate(-8deg) translateY(-2px); }
+  50% { transform: rotate(8deg) translateY(2px); }
+  100% { transform: rotate(-8deg) translateY(-2px); }
+}
+#btnRoll {
+  margin-left: 12px; padding: 8px 18px; font-size: 15px; font-weight: bold;
+  background: linear-gradient(180deg,#e8b64c,#c98a1e); color: #3a2504;
+  border: none; border-radius: 8px; cursor: pointer;
+}
+#btnRoll:disabled { background: #d8cdb4; color: #9a8d70; cursor: default; }
+
+#log {
+  flex: 1 1 auto; margin-top: 12px; overflow-y: auto;
+  background: #fffaf0; border: 1px solid #e2d5b4; border-radius: 8px;
+  padding: 6px 8px; font-size: 12.5px; line-height: 1.55;
+}
+#log div { border-bottom: 1px dashed #eee3c8; padding: 2px 0; }
+#log .c0 { color: #c0392b; } #log .c1 { color: #b7791f; }
+#log .c2 { color: #2471a3; } #log .c3 { color: #1e8449; }
+
+#btnNew {
+  margin-top: 10px; padding: 7px 0; font-size: 14px;
+  background: #f0e3c6; border: 1px solid #cdb488; border-radius: 8px; color: #6a5530; cursor: pointer;
+}
+
+/* ---------- 覆盖层通用 ---------- */
+.overlay {
+  position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+  background: rgba(60,45,20,.45);
+  display: flex; align-items: center; justify-content: center; z-index: 10;
+}
+.panel {
+  background: linear-gradient(175deg,#fdf6e0,#f3e6c4);
+  border: 1px solid #c9ab72; border-radius: 16px;
+  padding: 26px 34px; min-width: 320px; text-align: center;
+  box-shadow: 0 10px 40px rgba(0,0,0,.35);
+}
+.panel h1 { color: #7a4a12; letter-spacing: 10px; font-size: 26px; margin-bottom: 14px; }
+.panel h2 { color: #7a4a12; margin-bottom: 14px; }
+.panel p { margin-bottom: 14px; font-size: 15px; }
+
+.cfg-title { font-size: 13px; color: #8a795a; margin: 10px 0 6px; text-align: left; }
+/* 分段切换框：整体一个胶囊，选中段高亮 */
+.seg { display: flex; width: 100%; border: 1px solid #c9ab72; border-radius: 9px; overflow: hidden; background: #f6ecd4; }
+.seg-opt { flex: 1 1 0; text-align: center; padding: 7px 4px; cursor: pointer; }
+.seg-opt + .seg-opt { border-left: 1px solid #d8c9a6; }
+.seg-opt.on { background: linear-gradient(180deg,#e8b64c,#c98a1e); }
+.seg-opt .seg-main { display: block; font-size: 13.5px; color: #8a795a; }
+.seg-opt .seg-sub { display: block; font-size: 10px; color: #a8946e; margin-top: 1px; }
+.seg-opt.on .seg-main { color: #3a2504; font-weight: bold; }
+.seg-opt.on .seg-sub { color: #6a4a10; }
+.cfgrow { display: flex; align-items: center; margin: 5px 0; }
+.cfgrow .dot { width: 16px; height: 16px; border-radius: 50%; margin-right: 8px; flex: 0 0 16px; }
+.cfgrow .lab { width: 30px; font-size: 14px; font-weight: bold; }
+.opt { display: flex; margin-left: 8px; }
+.opt button {
+  padding: 4px 12px; font-size: 13px; margin-left: 4px;
+  background: #f6ecd4; border: 1px solid #cbb98e; border-radius: 6px; cursor: pointer; color: #6a5530;
+}
+.opt button.on { background: linear-gradient(180deg,#e8b64c,#c98a1e); color: #3a2504; font-weight: bold; border-color: #a97b16; }
+
+.btnrow .bigbtn { margin: 0 5px; }
+.bigbtn {
+  margin-top: 16px; padding: 10px 30px; font-size: 17px; font-weight: bold;
+  background: linear-gradient(180deg,#e8b64c,#c98a1e); color: #3a2504;
+  border: none; border-radius: 10px; cursor: pointer;
+}
+.bigbtn.plain { background: #f0e3c6; color: #6a5530; border: 1px solid #cdb488; }
+
+/* ---------- SVG 飞机高亮 ---------- */
+.plane { cursor: default; }
+.plane .halo { display: none; }
+.plane.hl { cursor: pointer; }
+.plane.hl .halo { display: block; animation: breath 0.9s infinite; }
+@keyframes breath {
+  0%, 100% { stroke-opacity: 1; }
+  50% { stroke-opacity: 0.25; }
+}
+.plane.hl .body { stroke-width: 1.5; }
+
+/* 窄屏：侧栏收到底部 */
+@media (max-width: 640px) {
+  #wrap { flex-direction: column; padding: 6px; }
+  #side { flex: 0 0 auto; margin-left: 0; margin-top: 6px; padding: 8px 10px; }
+  #log { max-height: 90px; }
+}
