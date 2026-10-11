@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>修仙大富翁 v2 · 纯离线</title>
+<script>/* 加载期错误可见化：出错时写进标签页标题，方便用户报障 */
+window.addEventListener('error',function(e){try{document.title='脚本错误: '+(e.message||'?')+' @line '+(e.lineno||'?')}catch(_){}});
+</script>
+<link rel="stylesheet" href="css/style.css?v=20261010h">
+</head>
+<body>
+<div id="app">
+  <header>
+    <div class="brand"><span id="brandIco"></span>修仙大富翁<span class="ver">纯离线 · 数据保存在本机 · v2</span></div>
+    <div class="topbtns">
+      <select id="selSpeed" class="pill"><option value="1">速度 1×</option><option value="2">速度 2×</option><option value="4">速度 4×</option><option value="8">速度 8×</option></select>
+      <button id="btnHelp" class="pill">规则</button>
+      <button id="btnRestart" class="pill">重开</button>
+      <span id="endgameBanner" class="hidden"></span>
+    </div>
+  </header>
+  <main>
+    <div id="boardWrap">
+      <div id="board">
+        <div id="center">
+          <div id="centerArt"></div><div id="centerVeil"></div>
+          <div id="centerTitle">修仙大富翁</div>
+          <div id="centerSub">灵石铸道基 · 修为问长生</div>
+          <div id="diceBox"><span class="die" id="die1"></span><span class="die" id="die2"></span></div>
+          <div id="turnInfo">—</div>
+          <div id="roundInfo">第 1 / 40 轮</div>
+        </div>
+        <div id="tokenLayer"></div>
+      </div>
+    </div>
+      <aside id="side">
+      <div class="panel" id="players"></div>
+      <div class="panel" id="actionPanel">
+        <button id="btnRoll" class="bigbtn" disabled>掷 骰</button>
+        <button id="btnEnd" class="bigbtn ghost hidden">结束回合</button>
+        <div id="autoRow"><button id="btnBag" class="pill" disabled>背包</button><button id="btnAuto" class="pill">托管</button><span>托管后由 AI 代打你的回合</span></div>
+      </div>
+      <div class="panel" id="logPanel"><div id="logBox"></div></div>
+    </aside>
+  </main>
+</div>
+<div id="toast"></div>
+<div id="modalRoot"></div>
+<div class="overlay" id="startOverlay">
+  <div class="ov-box home-box">
+    <h1>修仙大富翁</h1>
+    <div class="sub2">灵石是钱，修为是命，攒够修为就飞升 —— 不必把对手逼到破产</div>
+    <div class="home-menu">
+      <button id="btnNew" class="startbtn">开 新 一 局</button>
+      <button id="btnContinue" class="startbtn ghost" disabled>继 续 游 戏</button>
+      <button id="btnHomeSettings" class="startbtn ghost">设 置</button>
+      <button id="btnHomeHelp" class="pill">玩 法 说 明</button>
+    </div>
+  </div>
+</div>
+<div class="overlay hidden" id="setupOverlay">
+  <div class="ov-box setup-box">
+    <h1 style="font-size:24px;letter-spacing:4px">开 新 一 局</h1>
+    <div class="setup-sec">选择你扮演的修士（其余三位由 AI 出演，性格实效见卡面）</div>
+    <div class="ov-avs" id="setupAvs"></div>
+    <div class="setup-sec">对局参数（超范围会自动修正到上限内）</div>
+    <div class="setup-grid">
+      <label>游戏轮数<input id="cfgRound" type="number" value="40" min="10" max="80"><span class="rng">10 ~ 80</span></label>
+      <label>飞升修为门槛<input id="cfgXw" type="number" value="150" min="50" max="300"><span class="rng">50 ~ 300 修为</span></label>
+      <label>飞升基础花费<input id="cfgRs" type="number" value="800" min="300" max="5000"><span class="rng">300 ~ 5000 灵石（随轮通胀、洞府折抵）</span></label>
+      <label>初始灵石<input id="cfgStart" type="number" value="1800" min="500" max="9999"><span class="rng">500 ~ 9999 灵石</span></label>
+    </div>
+    <div class="modal-btns" style="margin-top:16px">
+      <button id="btnSetupBack">返 回</button>
+      <button id="btnSetupGo" class="primary">入 世 修 行</button>
+    </div>
+  </div>
+</div>
+<div class="overlay hidden" id="settingsOverlay">
+  <div class="ov-box" style="max-width:460px">
+    <h1 style="font-size:24px;letter-spacing:4px">设 置</h1>
+    <div class="setup-grid" style="margin-top:14px">
+      <label>回合速度<select id="cfgSpeed"><option value="1">速度 1×</option><option value="2">速度 2×</option><option value="4">速度 4×</option><option value="8">速度 8×</option></select></label>
+      <label class="tgl-label"><span>自动结束回合<input id="cfgAutoEnd" type="checkbox"><i></i></span><span class="rng">整理阶段无可用符时，自动替你结束回合</span></label>
+    </div>
+    <div class="setup-tip">存档每回合自动保存在本机浏览器；换电脑或换浏览器存档不互通。</div>
+    <button id="btnWipe" class="startbtn ghost">清除本机存档</button>
+    <div class="modal-btns" style="margin-top:14px">
+      <button id="btnSetBack" class="primary">返 回</button>
+    </div>
+  </div>
+</div>
+<div class="overlay hidden" id="endOverlay">
+  <div class="ov-box">
+    <h1 id="endTitle">飞升成功</h1>
+    <div class="sub2" id="endReason"></div>
+    <div id="endStats"></div>
+    <button id="btnAgain" class="startbtn">再 入 红 尘</button>
+  </div>
+</div>
+<script src="js/data.js?v=20261010n"></script>
+<script src="js/audio.js?v=20261010n"></script>
+<script src="js/ui.js?v=20261010n"></script>
+<script src="js/game.js?v=20261010n"></script>
+<script src="js/tests.js?v=20261010n"></script>
+</body>
+</html>

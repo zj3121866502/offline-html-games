@@ -1,0 +1,213 @@
+*{box-sizing:border-box;margin:0;padding:0}
+/* SVG 图标全局兜底：无 width/height 属性的 svg 默认 300×150，必须先锁死尺寸 */
+.ico{width:1em;height:1em;display:inline-block;vertical-align:-0.12em}
+.hidden{display:none!important}
+body{font-family:"Microsoft YaHei","PingFang SC",sans-serif;background:#121826;color:#e8e2d0;min-height:100vh;overflow-x:hidden}
+body.hasbg{background-size:cover;background-position:center}
+body.hasbg::before{content:'';position:fixed;inset:0;background:rgba(10,14,24,.72);z-index:-1}
+/* 右下角渐变压暗：遮盖生成图水印，视觉为自然暗角 */
+body.hasbg::after{content:'';position:fixed;right:0;bottom:0;width:240px;height:130px;
+  background:linear-gradient(135deg,transparent,rgba(10,14,24,.92) 65%);pointer-events:none;z-index:-1}
+#app{max-width:1240px;margin:0 auto;padding:12px 14px 30px}
+header{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:12px}
+.brand{font-size:22px;font-weight:bold;color:#f0d998;text-shadow:0 2px 8px rgba(0,0,0,.5)}
+.brand .ico{width:22px;height:22px;vertical-align:-4px;margin-right:4px;color:#f0d998}
+.brand .ver{font-size:12px;color:#9aa4b8;font-weight:normal;margin-left:8px}
+.topbtns{margin-left:auto;display:flex;gap:8px;align-items:center}
+#endgameBanner{font-size:13px;font-weight:bold;color:#ffd0d0;background:rgba(120,20,20,.75);
+  border:1px solid #a8341f;border-radius:8px;padding:6px 12px;letter-spacing:1px}
+button{cursor:pointer;border:none;border-radius:8px;font-family:inherit}
+.pill{background:#2a3550;color:#dce4f5;border:1px solid #3d4a6b;font-size:13px;padding:6px 14px}
+.pill:hover{border-color:#f0d998;color:#f0d998}
+main{display:flex;gap:14px;align-items:flex-start;flex-wrap:wrap}
+/* ===== 棋盘 ===== */
+#boardWrap{flex:1;min-width:320px;max-width:min(720px,calc(100vh - 84px))}
+#board{position:relative;display:grid;grid-template-columns:repeat(9,1fr);grid-template-rows:repeat(9,1fr);
+  aspect-ratio:1/1;background:linear-gradient(160deg,#f7eed6,#efe0bd);border-radius:14px;
+  box-shadow:0 10px 40px rgba(0,0,0,.45),inset 0 0 0 3px #d9c69a;padding:3px;gap:2px}
+.tile{position:relative;border-radius:7px;background:#fbf4e2;border:1px solid #dcc99f;overflow:hidden;
+  display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;
+  font-size:1em;line-height:1.15;padding:2px 1px;cursor:default}
+.tile .ic{line-height:0;color:#7a5b2a}
+.tile .ic .ico{width:1.45em;height:1.45em}
+.tile .nm{font-weight:bold;font-size:.92em;color:#4a3b22;max-width:100%;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
+.tile .sub{font-size:.78em;color:#8a795a}
+.tile .tint{position:absolute;inset:0;opacity:.30;pointer-events:none}
+.tile .pips{position:absolute;bottom:1px;left:0;right:0;font-size:.7em;color:#a8341f;letter-spacing:1px;text-shadow:0 0 2px #fff}
+.tile.corner{background:#f3e3bd;border-width:2px;border-color:#cdb488}
+.tile.corner .nm{font-size:.95em}
+/* 当前行动玩家所在地块：绿色高亮 */
+.tile.curp{background:#cdecc0;border-color:#7fbf6f;outline:2.5px solid #6cbf5c;outline-offset:-2px}
+.tile.curp .nm{color:#2f5d24}
+.tile.curp .sub{color:#4e7a42}
+#center{grid-area:2/2/9/9;border-radius:12px;margin:1.5%;position:relative;display:flex;flex-direction:column;
+  align-items:center;justify-content:center;gap:6%;text-align:center;overflow:hidden;
+  background:radial-gradient(ellipse at 50% 38%,#fdf6e0 0%,#f0dcae 68%,#e3c98d 100%);
+  border:2px dashed #c9ab72;box-shadow:inset 0 0 40px rgba(160,120,40,.25)}
+/* 中心立绘与蒙层是绝对定位图层：放大 20% 裁掉生成图边缘水印 */
+#centerArt{position:absolute;inset:0;background-size:120%;background-position:center;opacity:.5}
+#centerVeil{position:absolute;inset:0;background:radial-gradient(ellipse at center,rgba(253,246,224,.25),rgba(240,220,174,.75))}
+/* 仅约束内容层；图层名排除在外，否则顺序覆盖会把立绘拽进 flex 流（P0-3） */
+#center>:not(#centerArt):not(#centerVeil){position:relative}
+#centerTitle{font-size:1.7em;font-weight:bold;color:#7a4a12;letter-spacing:6px;text-shadow:0 1px 0 #fff8e0}
+#centerSub{font-size:.85em;color:#9a7a3f;margin-top:-4%}
+#diceBox{display:flex;gap:.4em;font-size:2.6em;color:#4a3b22}
+#diceBox .die{width:1.15em;height:1.15em;display:block}
+#diceBox.rolling .die{animation:shake .12s infinite}
+@keyframes shake{0%{transform:rotate(-8deg) translateY(-2px)}50%{transform:rotate(8deg) translateY(2px)}100%{transform:rotate(-8deg) translateY(-2px)}}
+#turnInfo{font-size:1em;color:#5a4218;font-weight:bold;min-height:1.4em}
+#roundInfo{font-size:.8em;color:#9a7a3f}
+/* 棋子 */
+#tokenLayer{position:absolute;inset:0;pointer-events:none}
+.tok{position:absolute;width:9.5%;height:9.5%;display:flex;align-items:center;justify-content:center;
+  transition:left .14s ease,top .14s ease;transform:translate(-50%,-50%)}
+.tok .bubble{width:74%;height:74%;border-radius:50%;background:#fffdf5;border:.16em solid var(--pc);
+  display:flex;align-items:center;justify-content:center;overflow:hidden;font-size:1.5em;
+  box-shadow:0 2px 6px rgba(0,0,0,.35);position:relative}
+.tok .bubble img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;border-radius:50%}
+.tok .bubble .avico{position:absolute;left:50%;top:50%;width:66%;height:66%;transform:translate(-50%,-50%);color:var(--pc)}
+.tok.active .bubble{animation:bounce 1s infinite}
+@keyframes bounce{0%,100%{transform:translateY(0)}50%{transform:translateY(-12%)}}
+/* ===== 侧栏 ===== */
+#side{width:330px;flex:none;display:flex;flex-direction:column;gap:10px}
+.panel{background:rgba(28,36,56,.88);border:1px solid #33405f;border-radius:12px;padding:10px 12px}
+#players{display:flex;flex-direction:column;gap:7px}
+.pcard{display:flex;gap:9px;align-items:center;padding:7px 9px;border-radius:10px;border:1.5px solid #2b3550;background:#202a42;transition:border-color .2s,box-shadow .2s}
+/* 行动卡光环：先给固定色 fallback（老内核无 color-mix），支持的内核用人物色覆盖 */
+.pcard.active{border-color:var(--pc);box-shadow:0 0 12px rgba(240,217,152,.55)}
+.pcard.active{box-shadow:0 0 12px color-mix(in srgb,var(--pc) 55%,transparent)}
+.pcard.dead{opacity:.38}
+.pav{position:relative;width:44px;height:44px;flex:none;border-radius:50%;border:2px solid var(--pc);background:#fffdf5;
+  display:flex;align-items:center;justify-content:center;font-size:22px;overflow:hidden}
+.pav img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;border-radius:50%}
+.pav .avico{position:absolute;left:50%;top:50%;width:62%;height:62%;transform:translate(-50%,-50%);color:var(--pc)}
+.pinfo{flex:1;min-width:0}
+.pnm{font-weight:bold;font-size:14px;display:flex;gap:6px;align-items:center;flex-wrap:wrap}
+.ptag{font-size:10px;background:#2c3a5c;color:#aebbd8;border-radius:8px;padding:0 7px}
+.ptag.rich{background:#4a3a12;color:#f0d998}
+.prs{font-size:12px;color:#c8d2e8;display:flex;gap:10px;margin-top:2px;flex-wrap:wrap}
+.pitems{font-size:11px;color:#93a0bd;margin-top:2px}
+.pitems .ico{width:12px;height:12px;vertical-align:-2px;margin-right:1px}
+.pstat{display:flex;flex-direction:column;align-items:flex-end;gap:2px;font-size:11px}
+.badge{background:#3a2b4f;color:#d9c2f0;border-radius:8px;padding:0 7px}
+.badge.shield{background:#173a4a;color:#9adcf0}
+.badge.perfect{background:#4a3a12;color:#ffe08a;animation:glow 1.2s infinite alternate}
+@keyframes glow{from{box-shadow:0 0 2px #f0d998}to{box-shadow:0 0 10px #f0d998}}
+#actionPanel{display:flex;flex-direction:column;gap:8px}
+.bigbtn{background:linear-gradient(180deg,#e8b64c,#c98a1e);color:#3a2504;font-size:17px;font-weight:bold;
+  padding:12px;border-radius:12px;box-shadow:0 3px 0 #8a5c0e;letter-spacing:4px}
+.bigbtn:disabled{background:#3a4560;color:#6b7690;box-shadow:none;cursor:not-allowed}
+.bigbtn.ghost{background:#2a3550;color:#dce4f5;box-shadow:0 3px 0 #1a2236;font-size:14px;letter-spacing:2px}
+.bigbtn:not(:disabled):hover{filter:brightness(1.08)}
+#autoRow{display:flex;gap:6px;align-items:center;font-size:11px;color:#9aa4b8}
+#autoRow .pill{flex:none;white-space:nowrap;font-size:12px;padding:5px 11px}
+#autoRow span{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+#logBox{height:190px;overflow-y:auto;font-size:12px;line-height:1.7;color:#b9c3d9}
+#logBox .l{border-bottom:1px dashed #2b3550;padding:2px 0}
+#logBox .rn{color:#6b7690;font-size:10px;margin-right:4px}
+#logBox b{color:#f0d998}
+/* toast / modal */
+#toast{position:fixed;top:60px;left:50%;transform:translateX(-50%);z-index:1300;display:flex;flex-direction:column;gap:6px;align-items:center;pointer-events:none}
+.tst{background:rgba(20,26,42,.92);border:1px solid #f0d99855;color:#ffe9b0;border-radius:999px;padding:8px 20px;font-size:13px;box-shadow:0 4px 16px rgba(0,0,0,.4);animation:tstin .18s ease}
+@keyframes tstin{from{opacity:0;transform:translateY(-8px)}to{opacity:1}}
+.modal-overlay{position:fixed;inset:0;background:rgba(8,11,20,.62);display:flex;align-items:center;justify-content:center;z-index:1000}
+.modal-box{background:linear-gradient(175deg,#26314e,#1c2438);border:1px solid #4a5a85;border-radius:16px;
+  padding:22px 26px;max-width:520px;width:92%;box-shadow:0 14px 50px rgba(0,0,0,.6);animation:pop .18s ease}
+@keyframes pop{from{transform:scale(.92);opacity:0}to{transform:scale(1);opacity:1}}
+.modal-title{font-size:17px;font-weight:bold;color:#f0d998;margin-bottom:10px}
+.modal-title .ico{width:20px;height:20px;vertical-align:-4px;color:#f0d998}
+.modal-msg .ico,.modal-box button .ico{width:16px;height:16px;vertical-align:-3px;color:#ffd97a}
+#logBox .ico{width:13px;height:13px;vertical-align:-2px}
+.modal-msg{font-size:14px;color:#d5deef;line-height:1.8;margin-bottom:16px;word-break:break-all;white-space:pre-wrap}
+.modal-msg .big{font-size:15px;color:#fff}
+.modal-btns{display:flex;gap:10px;flex-wrap:wrap;justify-content:flex-end}
+.modal-btns button{min-width:80px;padding:9px 16px;font-size:14px;border-radius:9px;background:#39466b;color:#e6ecf8}
+.modal-btns button.primary{background:linear-gradient(180deg,#e8b64c,#c98a1e);color:#3a2504;font-weight:bold}
+.modal-btns button:disabled{opacity:.4;cursor:not-allowed}
+.modal-btns button:not(:disabled):hover{filter:brightness(1.12)}
+/* 开始 / 结束 */
+.overlay{position:fixed;inset:0;background:rgba(8,11,20,.82);z-index:1400;display:flex;align-items:center;justify-content:center}
+.ov-box{background:linear-gradient(175deg,#26314e,#161d30);border:1px solid #5a6a95;border-radius:20px;
+  padding:34px 40px;max-width:620px;width:94%;text-align:center;box-shadow:0 20px 70px rgba(0,0,0,.7)}
+.ov-box h1{font-size:30px;color:#f0d998;letter-spacing:8px;margin-bottom:6px}
+.ov-box .sub2{color:#9aa4b8;font-size:13px;margin-bottom:18px}
+.ov-avs{display:flex;justify-content:center;gap:14px;margin-bottom:18px}
+.ov-avs .a{display:flex;flex-direction:column;align-items:center;gap:4px;font-size:12px;color:#aebbd8}
+.ov-avs .a .pav{width:58px;height:58px;font-size:28px}
+.startbtn{background:linear-gradient(180deg,#e8b64c,#c98a1e);color:#3a2504;font-size:19px;font-weight:bold;
+  padding:13px 52px;border-radius:14px;box-shadow:0 4px 0 #8a5c0e;letter-spacing:6px}
+.startbtn.ghost{display:block;margin:0 auto 12px;background:#2a3550;color:#dce4f5;box-shadow:0 4px 0 #1a2236;
+  font-size:15px;letter-spacing:2px;padding:11px 36px}
+.startbtn.ghost:hover{filter:brightness(1.15)}
+#endStats{display:flex;flex-direction:column;gap:6px;margin:14px 0 20px}
+#endStats .er{display:flex;align-items:center;gap:10px;background:#1c2438;border-radius:10px;padding:8px 12px;font-size:14px}
+#endStats .er.win{border:1px solid #f0d998;background:#2c2a1a}
+.xwsrc{font-size:11px;color:#93a0bd}
+.ov-avs .a .axis{color:#ffd97a;font-size:11px}
+@media(max-width:1020px){#side{width:100%}#logBox{height:120px}}
+/* 开局选人 */
+.ov-avs .a{cursor:pointer;border:1.5px solid transparent;border-radius:10px;padding:6px 9px;transition:transform .12s,background .12s}
+.ov-avs .a:hover{transform:translateY(-2px)}
+.ov-avs .a.sel{border-color:#f0d998;background:rgba(240,217,152,.14)}
+.ov-avs .a.sel .pav{box-shadow:0 0 14px rgba(240,217,152,.85)}
+.ov-avs .a .hint{font-size:11px;color:#8f9cb8}
+.ov-avs .a.sel .hint{color:#f0d998}
+.ov-avs .a.sel::after{content:'由你扮演';font-size:11px;color:#f0d998;letter-spacing:1px}
+/* 首页菜单 / 开局配置 / 设置 */
+.home-menu{display:flex;flex-direction:column;gap:12px;align-items:center;margin-bottom:10px}
+.home-menu button{width:280px;text-align:center}
+.home-menu .startbtn{padding-left:0;padding-right:0}
+.home-menu .pill{padding:9px 0;letter-spacing:2px}
+.setup-box{max-width:640px}
+.setup-sec{font-size:14px;color:#f0d998;font-weight:bold;margin:12px 0 8px;text-align:left}
+.setup-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px 18px;background:#1c2438;border-radius:12px;padding:14px 18px}
+.setup-grid label{display:flex;flex-direction:column;gap:4px;font-size:13px;color:#c8d2e8;text-align:left}
+.setup-grid input,.setup-grid select{background:#121a2e;border:1px solid #3d4a6b;color:#f0e6c8;
+  border-radius:8px;padding:7px 10px;font-size:15px;font-family:inherit;width:100%}
+.setup-grid input:focus,.setup-grid select:focus{outline:none;border-color:#f0d998}
+.setup-grid .rng{font-size:10.5px;color:#71809e}
+.setup-tip{font-size:12px;color:#9aa4b8;line-height:1.8;background:#1c2438;border-radius:10px;padding:8px 12px;margin:12px 0}
+#btnWipe{margin-top:4px;font-size:14px;padding:10px 30px}
+#btnWipe:hover{filter:brightness(1.15)}
+/* 背包 */
+.bag-grid{max-height:62vh;overflow-y:auto;overflow-x:hidden;text-align:left;padding-right:4px}
+.bag-sec{font-size:13px;color:#f0d998;font-weight:bold;margin:10px 0 4px}
+.bag-row{display:flex;justify-content:space-between;gap:12px;font-size:13px;color:#d5deef;
+  background:#1c2438;border-radius:8px;padding:6px 10px;margin-bottom:4px;align-items:center}
+.bag-row span{color:#93a0bd;font-size:12px;text-align:right;word-break:break-all}
+.bag-row.dim{opacity:.45}
+.bag-row .ico{width:16px;height:16px;vertical-align:-3px;color:#ffd97a;flex:none}
+.bag-use{background:linear-gradient(180deg,#e8b64c,#c98a1e);color:#3a2504;font-weight:bold;font-size:12px;
+  border:none;border-radius:8px;padding:4px 12px;flex:none;font-family:inherit;cursor:pointer}
+.bag-use:not(:disabled):hover{filter:brightness(1.12)}
+.bag-use:disabled{background:#3a4560;color:#6b7690;cursor:not-allowed}
+/* 设置开关 */
+.tgl-label span:first-child{display:flex;align-items:center;gap:8px;font-size:14px;color:#e8e2d0}
+.tgl-label input{display:none}
+.tgl-label i{width:40px;height:22px;border-radius:11px;background:#3a4560;position:relative;transition:background .15s;flex:none}
+.tgl-label i::after{content:'';position:absolute;left:2px;top:2px;width:18px;height:18px;border-radius:50%;background:#dce4f5;transition:left .15s}
+.tgl-label input:checked+i{background:#c98a1e}
+.tgl-label input:checked+i::after{left:20px}
+/* ===== F9 开发者后门 ===== */
+/* DEV 按钮位于右上角 .topbtns 行内（pill 风格加绿），普通文档流不依赖 fixed */
+#dbgTab{background:rgba(6,30,12,.95);border:1.5px solid #22ff88;color:#22ff88;
+  font-weight:bold;box-shadow:0 0 8px rgba(34,255,136,.5)}
+#dbgTab:hover{background:#123a1d;color:#e6ffe9}
+#dbgPanel{position:fixed;right:10px;top:10px;z-index:2000;width:312px;max-height:92vh;overflow-y:auto;
+  background:rgba(5,11,6,.96);border:1px solid #1f7a3c;border-radius:10px;color:#9dffb0;
+  font-family:Consolas,"Courier New",monospace;font-size:12px;padding:8px 10px;box-shadow:0 8px 30px rgba(0,0,0,.6)}
+#dbgPanel .dbg-hd{color:#22ff88;font-weight:bold;letter-spacing:1px;border-bottom:1px dashed #1f7a3c;
+  padding-bottom:5px;margin-bottom:6px;display:flex;justify-content:space-between}
+#dbgPanel .dbg-sec{color:#f0d998;margin:7px 0 3px;font-weight:bold}
+#dbgPanel .dbg-row{display:flex;gap:4px;flex-wrap:wrap;margin:4px 0;align-items:center}
+#dbgPanel button{background:#123a1d;border:1px solid #2f8a4c;color:#9dffb0;font-family:inherit;font-size:11px;
+  border-radius:5px;padding:3px 7px;cursor:pointer}
+#dbgPanel button:hover{background:#1c5c2e;color:#e6ffe9}
+#dbgPanel input,#dbgPanel select{background:#0a1a0d;border:1px solid #2f8a4c;color:#9dffb0;
+  font-family:inherit;font-size:11px;border-radius:5px;padding:3px 5px;width:62px}
+#dbgPanel select{width:auto}
+#dbgPanel .dbg-tip{color:#4f9e66;font-size:10px;margin-top:6px;border-top:1px dashed #1f7a3c;padding-top:4px}
+#dbgPanel #dbgLog{margin-top:4px;color:#5fd97e;max-height:170px;overflow-y:auto;line-height:1.5;
+  white-space:pre-wrap;word-break:break-all}
+#dbgPanel #dbgLog .err{color:#ff7d7d}
+#dbgPanel #dbgLog .ok{color:#22ff88}
