@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AI中国象棋</title>
+  <link rel="icon" type="image/svg+xml" href="favicon.svg">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<div class="app-container">
+  <div class="game-screen">
+    <main class="main-content">
+      <!-- 棋盘区 -->
+      <section class="board-section" aria-label="象棋棋盘">
+        <h1>AI中国象棋</h1>
+        <div class="canvas-wrapper">
+          <div class="board-stage">
+            <canvas id="chessCanvas" width="450" height="500" aria-label="中国象棋棋盘"></canvas>
+            <div id="pieceLayer" class="piece-layer" aria-hidden="true"></div>
+            <div id="captureFlash" class="capture-flash" aria-hidden="true">吃</div>
+          </div>
+        </div>
+        <div class="board-info">
+          <span id="turnIndicator" class="turn-indicator">红方走子</span>
+          <span id="gameStatus" class="game-status"></span>
+        </div>
+      </section>
+
+      <!-- 控制区 -->
+      <aside class="control-section" aria-label="游戏控制">
+        <div class="player-info">
+          <div class="player-row" id="playerRedRow">
+            <span class="player-dot red-dot"></span>
+            <span class="player-label">红方（你）</span>
+            <span class="player-timer" id="redTimer">00:00</span>
+          </div>
+          <div class="player-row" id="playerBlackRow">
+            <span class="player-dot black-dot"></span>
+            <span class="player-label">黑方（AI棋友）</span>
+            <span class="player-timer" id="blackTimer">00:00</span>
+          </div>
+        </div>
+
+        <div class="control-group">
+          <label for="sideSelect">你的执子：</label>
+          <select id="sideSelect" aria-label="选择执子颜色">
+            <option value="red" selected>执红先行</option>
+            <option value="black">执黑后行</option>
+          </select>
+        </div>
+
+        <div class="control-group">
+          <label for="difficultySelect">棋友棋力：</label>
+          <select id="difficultySelect" aria-label="选择AI棋力">
+            <option value="medium" selected>新手棋友（刚学不久，会漏子）</option>
+            <option value="hard">普通棋友（有来有回）</option>
+            <option value="expert">老棋友（经验丰富，需认真）</option>
+            <option value="master">高手棋友（棋风犀利，步步紧逼）</option>
+            <option value="pro">大师棋友（棋艺精湛，力求一胜）</option>
+          </select>
+        </div>
+
+        <div class="control-group">
+          <label for="threadSelect">计算线程：</label>
+          <select id="threadSelect" aria-label="选择AI计算线程数">
+          </select>
+        </div>
+
+        <div class="control-group btn-group">
+          <button id="newGameBtn" class="btn btn-primary" type="button">新的一局</button>
+          <button id="undoBtn" class="btn btn-secondary" type="button">悔棋</button>
+          <button id="drawBtn" class="btn btn-secondary" type="button">求和</button>
+          <button id="resignBtn" class="btn btn-secondary" type="button">认输</button>
+          <button id="hintBtn" class="btn btn-secondary" type="button">提示</button>
+          <button id="flipBtn" class="btn btn-secondary" type="button">翻转棋盘</button>
+        </div>
+
+        <section class="play-side" aria-label="对局信息">
+          <div class="captured-tray">
+            <div class="captured-row">
+              <span class="captured-row__label"><span class="player-dot red-dot" aria-hidden="true"></span>红方吃子</span>
+              <div class="captured-row__pieces" id="capRedTray"><span class="captured-empty">—</span></div>
+            </div>
+            <div class="captured-row">
+              <span class="captured-row__label"><span class="player-dot black-dot" aria-hidden="true"></span>黑方吃子</span>
+              <div class="captured-row__pieces" id="capBlackTray"><span class="captured-empty">—</span></div>
+            </div>
+          </div>
+
+          <div id="moveHistoryScroll" class="move-history-scroll">
+            <ol id="moveList" class="move-list" aria-label="棋谱记录"></ol>
+            <p id="moveListEmpty" class="empty-hint">暂无记录，开始走子后将自动生成棋谱</p>
+          </div>
+        </section>
+      </aside>
+    </main>
+  </div>
+</div>
+
+<!-- 游戏结束弹窗 -->
+<div id="gameOverModal" class="modal-overlay" hidden>
+  <div class="modal-box">
+    <h2 id="gameOverTitle" class="modal-title">对局结束</h2>
+    <p id="gameOverResult" class="modal-result"></p>
+    <p id="gameOverComment" class="modal-comment"></p>
+    <div class="modal-actions">
+      <button id="modalNewGameBtn" class="btn btn-primary" type="button">再来一局</button>
+      <button id="modalCloseBtn" class="btn btn-secondary" type="button">关闭</button>
+    </div>
+  </div>
+</div>
+
+<script src="script.js"></script>
+</body>
+</html>
